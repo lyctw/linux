@@ -28,7 +28,6 @@
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/of.h>
-#include <linux/uaccess.h>
 
 #define DRV_NAME		"atcrtc100"
 #define RTC_REG(off)		\
@@ -220,14 +219,12 @@ const static struct rtc_class_ops rtc_ops = {
 
 static int atc_rtc_probe(struct platform_device *pdev)
 {
-	int (*read_fixup)(void __iomem *addr, unsigned int val,
-		unsigned int shift_bits);
 	struct atc_rtc *rtc = &rtc_platform_data;
 	int ret = -ENOENT;
 
 	spin_lock_init(&rtc->lock);
 
-	rtc->alarm_irq = platform_get_irq(pdev, 1);
+	rtc->alarm_irq = platform_get_irq(pdev, 2);
 	if (rtc->alarm_irq < 0)
 		goto err_exit;
 
@@ -238,6 +235,16 @@ static int atc_rtc_probe(struct platform_device *pdev)
 	rtc->res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!rtc->res)
 		goto err_exit;
+
+	ret = request_irq(rtc->alarm_irq, rtc_alarm, 0,
+			  "RTC Alarm : atcrtc100", rtc);
+	if (ret)
+		goto err_exit;
+
+	ret = request_irq(rtc->interrupt_irq, rtc_interrupt,
+			  0, "RTC Interrupt : atcrtc100", rtc);
+	if (ret)
+		goto err_interrupt_irq;
 
 	ret = -EBUSY;
 
@@ -254,15 +261,6 @@ static int atc_rtc_probe(struct platform_device *pdev)
 	if (!rtc->regbase)
 		goto err_ioremap1;
 
-	/* Check ID and Revision register 0x030110*/
-	read_fixup = symbol_get(readl_fixup);
-	ret = read_fixup(rtc->regbase, 0x030110, 8);
-	symbol_put(readl_fixup);
-	if (!ret){
-		dev_err(&pdev->dev, "failed read ID register, bitmap not support atcrtc100\n");
-		return -ENOENT;
-	}
-
 	if ((RTC_ID & ID_MSK) != ATCRTC100ID)
 		return -ENOENT;
 
@@ -276,13 +274,15 @@ static int atc_rtc_probe(struct platform_device *pdev)
 		return -ENOENT;
 	}
 #endif
+	RTC_CR |= RTC_EN;
 	platform_set_drvdata(pdev, rtc);
 
 	if (of_property_read_bool(pdev->dev.of_node, "wakeup-source"))
 		device_init_wakeup(&pdev->dev, true);
 
-	rtc->rtc_dev = devm_rtc_allocate_device(&pdev->dev);
-	rtc->rtc_dev->ops = &rtc_ops;
+	rtc->rtc_dev =
+		rtc_device_register(DRV_NAME, &pdev->dev,
+				    &rtc_ops, THIS_MODULE);
 
 	if (IS_ERR(rtc->rtc_dev)) {
 		ret = PTR_ERR(rtc->rtc_dev);
@@ -291,23 +291,6 @@ static int atc_rtc_probe(struct platform_device *pdev)
 
 	rtc->rtc_dev->max_user_freq = 256;
 	rtc->rtc_dev->irq_freq = 1;
-
-	ret = rtc_register_device(rtc->rtc_dev);
-	if (ret)
-		goto err_unmap;
-
-	ret = request_irq(rtc->alarm_irq, rtc_alarm, 0,
-			  "RTC Alarm : atcrtc100", rtc);
-	if (ret)
-		goto err_exit;
-
-	ret = request_irq(rtc->interrupt_irq, rtc_interrupt,
-			  0, "RTC Interrupt : atcrtc100", rtc);
-	if (ret)
-		goto err_interrupt_irq;
-
-	RTC_CR |= RTC_EN;
-
 	return 0;
 
 err_unmap:
@@ -326,6 +309,7 @@ static int atc_rtc_remove(struct platform_device *pdev)
 {
 	struct atc_rtc *rtc = platform_get_drvdata(pdev);
 
+	rtc_device_unregister(rtc->rtc_dev);
 	/*
 	 * Because generic rtc will not execute rtc_device_release()
 	 * when call rtc_device_unregister(),
