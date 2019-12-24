@@ -28,9 +28,11 @@
 #define GET_PD_TYPE(val)        val & PD_TYPE_MASK
 #define GET_PD_STATUS(val)      (val & PD_STATUS_MASK) >> 3
 
-#define RESET_VEC_OFF           0x50
-#define RESET_VEC_PER_CORE      0x4
-#define FLASH_BASE              0x80000000
+#define FLASH_BASE              0x80000000ULL
+#define SMU_RESET_VEC_LO_OFF 0x50
+#define SMU_RESET_VEC_HI_OFF 0x60
+#define SMU_HARTn_RESET_VEC_LO(n) (SMU_RESET_VEC_LO_OFF + (n * 0x4))
+#define SMU_HARTn_RESET_VEC_HI(n) (SMU_RESET_VEC_HI_OFF + (n * 0x4))
 
 // PD_type
 #define ACTIVE  0
