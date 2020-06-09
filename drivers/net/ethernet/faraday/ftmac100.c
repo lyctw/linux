@@ -51,6 +51,21 @@
 #error invalid RX_BUF_SIZE
 #endif
 
+#define xprintk(...)
+
+#define FTMAC100_RX_DESC(priv, index)     (&priv->descs->rxdes[index])
+#define FTMAC100_RX_DESC_EXT(priv, index) (&priv->descs->rxdes_ext[index])
+#define FTMAC100_TX_DESC(priv, index)     (&priv->descs->txdes[index])
+#define FTMAC100_TX_DESC_EXT(priv, index) (&priv->descs->txdes_ext[index])
+
+#define FTMAC100_CURRENT_RX_DESC_INDEX(priv) (priv->rx_pointer)
+#define FTMAC100_CURRENT_TX_DESC_INDEX(priv) (priv->tx_pointer);
+#define FTMAC100_CURRENT_CLEAN_TX_DESC_INDEX(priv) (priv->tx_clean_pointer);
+
+/* ftmac100_debug parameters */
+extern unsigned int FTMAC100_DEBUG;
+extern unsigned int FTMAC100_INCR;
+
 /******************************************************************************
  * private data
  *****************************************************************************/
@@ -936,7 +951,7 @@ static int ftmac100_poll(struct napi_struct *napi, int budget)
 
 	if (status & (FTMAC100_INT_NORXBUF | FTMAC100_INT_RPKT_LOST |
 		      FTMAC100_INT_AHB_ERR | FTMAC100_INT_PHYSTS_CHG)) {
-		if (net_ratelimit())
+		if (net_ratelimit() && FTMAC100_DEBUG)
 			netdev_info(netdev, "[ISR] = 0x%x: %s%s%s%s\n", status,
 				    status & FTMAC100_INT_NORXBUF ? "NORXBUF " : "",
 				    status & FTMAC100_INT_RPKT_LOST ? "RPKT_LOST " : "",
