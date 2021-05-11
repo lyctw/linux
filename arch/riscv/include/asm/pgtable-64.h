@@ -7,6 +7,7 @@
 #define _ASM_RISCV_PGTABLE_64_H
 
 #include <linux/const.h>
+#include <asm/andes.h>
 
 extern bool pgtable_l4_enabled;
 extern bool pgtable_l5_enabled;
@@ -89,6 +90,7 @@ static inline int pud_leaf(pud_t pud)
 static inline void set_pud(pud_t *pudp, pud_t pud)
 {
 	*pudp = pud;
+	andes_local_flush_tlb_all();
 }
 
 static inline void pud_clear(pud_t *pudp)
@@ -163,6 +165,7 @@ static inline void set_p4d(p4d_t *p4dp, p4d_t p4d)
 		*p4dp = p4d;
 	else
 		set_pud((pud_t *)p4dp, (pud_t){ p4d_val(p4d) });
+	andes_local_flush_tlb_all();
 }
 
 static inline int p4d_none(p4d_t p4d)
@@ -236,6 +239,7 @@ static inline void set_pgd(pgd_t *pgdp, pgd_t pgd)
 		*pgdp = pgd;
 	else
 		set_p4d((p4d_t *)pgdp, (p4d_t){ pgd_val(pgd) });
+	andes_local_flush_tlb_all();
 }
 
 static inline int pgd_none(pgd_t pgd)

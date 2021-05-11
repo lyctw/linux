@@ -260,12 +260,17 @@ static void __init parse_dtb(void)
 #endif
 }
 
+bool andestar45;
 void __init setup_arch(char **cmdline_p)
 {
+	long archid;
+
+	archid = sbi_get_marchid();
 	parse_dtb();
 	setup_initial_init_mm(_stext, _etext, _edata, _end);
 
 	*cmdline_p = boot_command_line;
+	andestar45 = ((archid & 0xF0) >> 4 == 4 && (archid & 0xF) == 5)?true:false;
 
 	early_ioremap_setup();
 	jump_label_init();

@@ -14,6 +14,7 @@
 #define __HAVE_ARCH_PUD_ALLOC_ONE
 #define __HAVE_ARCH_PUD_FREE
 #include <asm-generic/pgalloc.h>
+#include <asm/andes.h>
 
 static inline void pmd_populate_kernel(struct mm_struct *mm,
 	pmd_t *pmd, pte_t *pte)
@@ -21,6 +22,7 @@ static inline void pmd_populate_kernel(struct mm_struct *mm,
 	unsigned long pfn = virt_to_pfn(pte);
 
 	set_pmd(pmd, __pmd((pfn << _PAGE_PFN_SHIFT) | _PAGE_TABLE));
+	andes_local_flush_tlb_all();
 }
 
 static inline void pmd_populate(struct mm_struct *mm,
@@ -29,6 +31,7 @@ static inline void pmd_populate(struct mm_struct *mm,
 	unsigned long pfn = virt_to_pfn(page_address(pte));
 
 	set_pmd(pmd, __pmd((pfn << _PAGE_PFN_SHIFT) | _PAGE_TABLE));
+	andes_local_flush_tlb_all();
 }
 
 #ifndef __PAGETABLE_PMD_FOLDED
@@ -37,6 +40,7 @@ static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
 	unsigned long pfn = virt_to_pfn(pmd);
 
 	set_pud(pud, __pud((pfn << _PAGE_PFN_SHIFT) | _PAGE_TABLE));
+	andes_local_flush_tlb_all();
 }
 
 static inline void p4d_populate(struct mm_struct *mm, p4d_t *p4d, pud_t *pud)
@@ -45,6 +49,7 @@ static inline void p4d_populate(struct mm_struct *mm, p4d_t *p4d, pud_t *pud)
 		unsigned long pfn = virt_to_pfn(pud);
 
 		set_p4d(p4d, __p4d((pfn << _PAGE_PFN_SHIFT) | _PAGE_TABLE));
+		andes_local_flush_tlb_all();
 	}
 }
 
@@ -56,6 +61,7 @@ static inline void p4d_populate_safe(struct mm_struct *mm, p4d_t *p4d,
 
 		set_p4d_safe(p4d,
 			     __p4d((pfn << _PAGE_PFN_SHIFT) | _PAGE_TABLE));
+		andes_local_flush_tlb_all();
 	}
 }
 
@@ -65,6 +71,7 @@ static inline void pgd_populate(struct mm_struct *mm, pgd_t *pgd, p4d_t *p4d)
 		unsigned long pfn = virt_to_pfn(p4d);
 
 		set_pgd(pgd, __pgd((pfn << _PAGE_PFN_SHIFT) | _PAGE_TABLE));
+		andes_local_flush_tlb_all();
 	}
 }
 
@@ -76,6 +83,7 @@ static inline void pgd_populate_safe(struct mm_struct *mm, pgd_t *pgd,
 
 		set_pgd_safe(pgd,
 			     __pgd((pfn << _PAGE_PFN_SHIFT) | _PAGE_TABLE));
+		andes_local_flush_tlb_all();
 	}
 }
 
@@ -138,6 +146,8 @@ static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 		memcpy(pgd + USER_PTRS_PER_PGD,
 			init_mm.pgd + USER_PTRS_PER_PGD,
 			(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
+
+		andes_local_flush_tlb_all();
 	}
 	return pgd;
 }
