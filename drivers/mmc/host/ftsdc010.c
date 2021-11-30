@@ -1,6 +1,5 @@
-// SPDX-License-Identifier: GPL-2.0
 /* drivers/mmc/host/ftsdc010.c
- *  Copyright (C) 2021 Andestech
+ *  Copyright (C) 2010 Andestech
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -21,13 +20,14 @@
 #include <linux/slab.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
-#include <linux/io.h>
-#include "ftsdc010g.h"
+#include <asm/io.h>
+#include <asm/dmad.h>
+#include "ftsdc010.h"
 #include "../core/core.h"
 #include <linux/highmem.h>
 #include <linux/kernel.h>
 
-#define DRIVER_NAME "ftsdc010g"
+#define DRIVER_NAME "ftsdc010"
 #define REG_READ(addr) readl((host->base + addr))
 #define REG_WRITE(data, addr) writel((data), (host->base + addr))
 
@@ -48,15 +48,16 @@ static struct workqueue_struct *mywq;
 static const int dbgmap_err   = dbg_fail;
 static const int dbgmap_info  = dbg_info | dbg_conf;
 static const int dbgmap_debug = dbg_err | dbg_debug | dbg_info | dbg_conf;
-#define dbg(host, channels, args...)			\
-do {						\
-	if (dbgmap_err & channels)			\
-		dev_err(&host->pdev->dev, args);	\
-	else if (dbgmap_info & channels)		\
-		dev_info(&host->pdev->dev, args);	\
-	else if (dbgmap_debug & channels)		\
-		dev_dbg(&host->pdev->dev, args);	\
-} while (0)
+#define dbg(host, channels, args...)		  \
+	do {					  \
+	if (dbgmap_err & channels) 		  \
+		dev_err(&host->pdev->dev, args);  \
+	else if (dbgmap_info & channels)	  \
+		dev_info(&host->pdev->dev, args); \
+	else if (dbgmap_debug & channels)	  \
+		dev_dbg(&host->pdev->dev, args);  \
+	} while (0)
+static void finalize_request(struct ftsdc_host *host);
 static void ftsdc_send_request(struct mmc_host *mmc);
 #ifdef CONFIG_MMC_DEBUG
 static void dbg_dumpregs(struct ftsdc_host *host, char *prefix)
@@ -86,18 +87,20 @@ static void dbg_dumpregs(struct ftsdc_host *host, char *prefix)
 	ssta	= REG_READ(SDC_SDIO_STATUS_REG);
 	fea	= REG_READ(SDC_FEATURE_REG);
 
-	dbg(host, dbg_debug,
-		"%s CON:[%08x] STA:[%08x] INT:[%08x] PWR:[%08x] CLK:[%08x]\n",
-		prefix, con, sta, imask, pcon, ccon);
-	dbg(host, dbg_debug,
-		"%s DCON:[%08x] DTIME:[%08x] DLEN:[%08x] DWIDTH:[%08x]\n",
-		prefix, dcon, dtimer, dlen, bwidth);
-	dbg(host, dbg_debug,
-		"%s R0:[%08x]   R1:[%08x] R2:[%08x]   R3:[%08x]\n",
-		prefix, r0, r1, r2, r3);
-	dbg(host, dbg_debug,
-		"%s SCON1:[%08x]   SCON2:[%08x] SSTA:[%08x]   FEA:[%08x]\n",
-		prefix, scon1, scon2, ssta, fea);
+	dbg(host, dbg_debug, "%s CON:[%08x]  STA:[%08x]  INT:[%08x], PWR:[%08x], CLK:[%08x]\n",
+				prefix, con, sta, imask, pcon, ccon);
+
+	dbg(host, dbg_debug, "%s DCON:[%08x] DTIME:[%08x]"
+			       " DLEN:[%08x] DWIDTH:[%08x]\n",
+				prefix, dcon, dtimer, dlen, bwidth);
+
+	dbg(host, dbg_debug, "%s R0:[%08x]   R1:[%08x]"
+			       "   R2:[%08x]   R3:[%08x]\n",
+			       prefix, r0, r1, r2, r3);
+
+	dbg(host, dbg_debug, "%s SCON1:[%08x]   SCON2:[%08x]"
+			       "   SSTA:[%08x]   FEA:[%08x]\n",
+				prefix, scon1, scon2, ssta, fea);
 }
 
 static void prepare_dbgmsg(struct ftsdc_host *host, struct mmc_command *cmd,
@@ -119,8 +122,8 @@ static void prepare_dbgmsg(struct ftsdc_host *host, struct mmc_command *cmd,
 	}
 }
 
-static void dbg_dumpcmd(struct ftsdc_host *host,
-	struct mmc_command *cmd, int fail)
+static void dbg_dumpcmd(struct ftsdc_host *host, struct mmc_command *cmd,
+			int fail)
 {
 	unsigned int dbglvl = fail ? dbg_fail : dbg_debug;
 
@@ -148,30 +151,27 @@ static void dbg_dumpcmd(struct ftsdc_host *host,
 }
 #else
 static void dbg_dumpcmd(struct ftsdc_host *host,
-	struct mmc_command *cmd, int fail)
-{
-}
+			struct mmc_command *cmd, int fail) { }
 
-static void prepare_dbgmsg(struct ftsdc_host *host,
-	struct mmc_command *cmd, int stop)
-{
-}
+static void prepare_dbgmsg(struct ftsdc_host *host, struct mmc_command *cmd,
+			   int stop) { }
 
-static void dbg_dumpregs(struct ftsdc_host *host, char *prefix)
-{
-}
+static void dbg_dumpregs(struct ftsdc_host *host, char *prefix) { }
 
 #endif /* CONFIG_MMC_DEBUG */
 
 static inline bool ftsdc_dmaexist(struct ftsdc_host *host)
 {
-	return (host->dma.chan != NULL);
+	return (host->dma_req != NULL);
 }
 
 static inline u32 enable_imask(struct ftsdc_host *host, u32 imask)
 {
 	u32 newmask;
 
+#ifdef CONFIG_MMC_DEBUG
+	if (imask & SDC_STATUS_REG_SDIO_INTR) printk("\n*** E ***\n");
+#endif
 	newmask = REG_READ(SDC_INT_MASK_REG);
 	newmask |= imask;
 
@@ -184,6 +184,9 @@ static inline u32 disable_imask(struct ftsdc_host *host, u32 imask)
 {
 	u32 newmask;
 
+#ifdef CONFIG_MMC_DEBUG
+	if (imask & SDC_STATUS_REG_SDIO_INTR) printk("\n*** D ***\n");
+#endif
 	newmask = REG_READ(SDC_INT_MASK_REG);
 	newmask &= ~imask;
 
@@ -205,17 +208,16 @@ static inline void get_data_buffer(struct ftsdc_host *host)
 {
 	struct scatterlist *sg;
 
-	WARN_ON(host->buf_sgptr >= host->mrq->data->sg_len);
+	BUG_ON(host->buf_sgptr >= host->mrq->data->sg_len);
 	sg = &host->mrq->data->sg[host->buf_sgptr];
 	host->buf_page = 0;
 	host->buf_bytes = sg->length;
-	host->buf_ptr = host->dodma ?
-		(u32 *)(unsigned long)sg->dma_address : sg_virt(sg);
+	host->buf_ptr = host->dodma ? (u32 *)(unsigned long)sg->dma_address : sg_virt(sg);
 #ifdef CONFIG_HIGHMEM
 	if (PageHighMem(sg_page(sg))) {
 		host->buf_page = sg_page(sg);
 		host->buf_offset = sg->offset;
-		if (!host->dodma)
+		if(!host->dodma)
 			host->buf_ptr = 0;
 	}
 #endif
@@ -246,13 +248,15 @@ static inline u32 cal_blksz(unsigned int blksz)
 static void ftsdc_enable_irq(struct ftsdc_host *host, bool enable)
 {
 	unsigned long flags;
-
 	local_irq_save(flags);
+
 	host->irq_enabled = enable;
+
 	if (enable)
 		enable_irq(host->irq);
 	else
 		disable_irq(host->irq);
+
 	local_irq_restore(flags);
 }
 
@@ -264,19 +268,18 @@ static void do_pio_read(struct ftsdc_host *host)
 	void *tptr = 0;
 	u32 status;
 	u32 retry = 0;
+	BUG_ON(host->buf_bytes != 0);
 
-	WARN_ON(host->buf_bytes != 0);
 	while (host->buf_sgptr < host->mrq->data->sg_len) {
 		get_data_buffer(host);
 		tptr = host->buf_ptr;
 		while (host->buf_bytes) {
 			host->page_cnt = host->buf_bytes;
-			if (host->buf_page != 0) {
+			if(host->buf_page != 0) {
 				host->buf_ptr = kmap_atomic(host->buf_page);
 				tptr = host->buf_ptr;
 				tptr +=  host->buf_offset;
-				host->page_cnt = min((u32)(PAGE_SIZE-host->buf_offset),
-					host->buf_bytes);
+				host->page_cnt = min((u32)(PAGE_SIZE-host->buf_offset), host->buf_bytes);
 				host->buf_offset = 0;
 			}
 			host->buf_bytes -= host->page_cnt;
@@ -285,10 +288,10 @@ static void do_pio_read(struct ftsdc_host *host)
 				status = REG_READ(SDC_STATUS_REG);
 				if (status & SDC_STATUS_REG_FIFO_OVERRUN) {
 					fifo = host->fifo_len > host->page_cnt ?
-					host->page_cnt : host->fifo_len;
+						host->page_cnt : host->fifo_len;
 					dbg(host, dbg_pio,
-					"pio_read(): fifo:[%02i] buffer:[%03i] dcnt:[%08X]\n",
-					fifo, host->page_cnt,
+						"pio_read(): fifo:[%02i] buffer:[%03i] dcnt:[%08X]\n",
+						fifo, host->page_cnt,
 					REG_READ(SDC_DATA_LEN_REG));
 					host->page_cnt -= fifo;
 					host->buf_count += fifo;
@@ -296,13 +299,9 @@ static void do_pio_read(struct ftsdc_host *host)
 					while (fifo_words--)
 						*ptr++ = REG_READ(SDC_DATA_WINDOW_REG);
 					if (fifo & 3) {
-						u32 n;
-						u32 data;
-						u8 *p;
-
-						n = fifo & 3;
-						data = REG_READ(SDC_DATA_WINDOW_REG);
-						p = (u8 *)ptr;
+						u32 n = fifo & 3;
+						u32 data = REG_READ(SDC_DATA_WINDOW_REG);
+						u8 *p = (u8 *)ptr;
 						while (n--) {
 							*p++ = data;
 							data >>= 8;
@@ -316,13 +315,14 @@ static void do_pio_read(struct ftsdc_host *host)
 					}
 				}
 			}
-			if (host->buf_page != 0) {
+			if(host->buf_page != 0) {
 				kunmap_atomic(host->buf_ptr);
 				host->buf_page++;
 			}
 		}
 	}
 err:
+
 	host->buf_active = XFER_NONE;
 	host->complete_what = COMPLETION_FINALIZE;
 }
@@ -335,7 +335,7 @@ static void do_pio_write(struct ftsdc_host *host)
 	u32 status;
 	u32 retry = 0;
 
-	WARN_ON(host->buf_bytes != 0);
+	BUG_ON(host->buf_bytes != 0);
 	while (host->buf_sgptr < host->mrq->data->sg_len) {
 		get_data_buffer(host);
 		dbg(host, dbg_pio,
@@ -344,10 +344,9 @@ static void do_pio_write(struct ftsdc_host *host)
 		while (host->buf_bytes) {
 			host->page_cnt = host->buf_bytes;
 			tptr = host->buf_ptr;
-			if (host->buf_page != 0) {
+			if(host->buf_page != 0) {
 				host->buf_ptr = kmap_atomic(host->buf_page);
-				host->page_cnt = min((u32)(PAGE_SIZE-host->buf_offset),
-					host->page_cnt);
+				host->page_cnt = min((u32)(PAGE_SIZE-host->buf_offset), host->page_cnt);
 				tptr = host->buf_ptr;
 				tptr += host->buf_offset;
 				host->buf_offset = 0;
@@ -358,10 +357,10 @@ static void do_pio_write(struct ftsdc_host *host)
 				status = REG_READ(SDC_STATUS_REG);
 				if (status & SDC_STATUS_REG_FIFO_UNDERRUN) {
 					fifo = host->fifo_len > host->page_cnt ?
-					host->page_cnt : host->fifo_len;
+						host->page_cnt : host->fifo_len;
 					dbg(host, dbg_pio,
-					"pio_write(): fifo:[%02i] buffer:[%03i] dcnt:[%08X]\n",
-					fifo, host->buf_bytes,
+						"pio_write(): fifo:[%02i] buffer:[%03i] dcnt:[%08X]\n",
+						fifo, host->buf_bytes,
 					REG_READ(SDC_DATA_LEN_REG));
 					host->page_cnt -= fifo;
 					host->buf_count += fifo;
@@ -378,128 +377,64 @@ static void do_pio_write(struct ftsdc_host *host)
 					}
 				}
 			}
-			if (host->buf_page != 0) {
+			if(host->buf_page != 0) {
 				kunmap_atomic(host->buf_ptr);
 				host->buf_page++;
 			}
 		}
 	}
-
 err:
 	host->buf_active = XFER_NONE;
 	host->complete_what = COMPLETION_FINALIZE;
 }
 
-static void ftsdc_dma_cleanup(struct ftsdc_host *host)
+static void do_dma_access(struct ftsdc_host *host)
 {
-	struct mmc_data                 *data = host->mrq->data;
+	int res;
+	unsigned long timeout;
+	dmad_chreq *req = host->dma_req;
+	dmad_drb *drb = 0;
 
-	if (data)
-		dma_unmap_sg(host->dma.chan->device->dev,
-			data->sg, data->sg_len, mmc_get_dma_dir(data));
-}
+	while (host->buf_sgptr < host->mrq->data->sg_len) {
 
-static int ftsdc_configure_dma(struct ftsdc_host *host)
-{
-	host->dma.chan = dma_request_slave_channel_reason(&host->pdev->dev,
-		"rxtx");
-	if (PTR_ERR(host->dma.chan) == -ENODEV) {
-		struct ftsdc_mmc_config *pdata = host->pdev->dev.platform_data;
-		dma_cap_mask_t mask;
+		reinit_completion(&host->dma_complete);
+		get_data_buffer(host);
 
-		if (!pdata || !pdata->dma_filter)
-			return -ENODEV;
+		dbg(host, dbg_dma,
+		    "dma_%s(): new target: [%i]@[%p]\n",
+		    host->buf_active == XFER_READ ? "read" : "write",
+		    host->buf_bytes, host->buf_ptr);
 
-		dma_cap_zero(mask);
-		dma_cap_set(DMA_SLAVE, mask);
-		host->dma.chan = dma_request_channel(mask, pdata->dma_filter,
-			pdata->dma_slave);
-		if (!host->dma.chan)
-			host->dma.chan = ERR_PTR(-ENODEV);
+		res = dmad_alloc_drb(req, &drb);
+
+		if (res != 0 || (drb == 0)) {
+			dbg(host, dbg_err, "%s() Failed to allocate dma request block!\n", __func__);
+			host->mrq->data->error = -ENODEV;
+			goto err;
+		}
+		drb->addr0 = host->mem->start + SDC_DATA_WINDOW_REG;
+		drb->addr1 = (dma_addr_t)(unsigned long)host->buf_ptr;
+		drb->req_cycle = dmad_bytes_to_cycles(req, host->buf_bytes);
+		drb->sync = &host->dma_complete;
+		timeout = SDC_TIMEOUT_BASE*((host->buf_bytes+511)>>9);
+		res =  dmad_submit_request(req, drb, 1);
+		if (res != 0) {
+			dbg(host, dbg_err, "%s() Failed to submit dma request block!\n", __func__);
+			host->mrq->data->error = -ENODEV;
+			goto err;
+		}
+		dbg(host, dbg_err, "reach here!\n");
+		if (wait_for_completion_timeout(&host->dma_complete, timeout) == 0) {
+			dbg(host, dbg_err, "%s: read timeout\n", __func__);
+			host->mrq->data->error = -ETIMEDOUT;
+			goto err;
+		}
 	}
-	if (IS_ERR(host->dma.chan))
-		return PTR_ERR(host->dma.chan);
-
-	dev_info(&host->pdev->dev, "using %s for DMA transfers\n",
-		dma_chan_name(host->dma.chan));
-	host->dma_conf.src_addr = host->mem->start + SDC_DATA_WINDOW_REG;
-	host->dma_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-	host->dma_conf.src_maxburst = 4;
-	host->dma_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-	host->dma_conf.dst_maxburst = 4;
-
-	return 0;
-}
-
-
-static void ftsdc_dma_complete(void *arg,
-	const struct dmaengine_result *result)
-{
-	struct ftsdc_host	*host = arg;
-	struct mmc_data		*data = host->mrq->data;
 
 	host->dma_finish = true;
-	data->error = result->result;
+err:
 	host->buf_active = XFER_NONE;
 	host->complete_what = COMPLETION_FINALIZE;
-	ftsdc_dma_cleanup(host);
-	tasklet_schedule(&host->pio_tasklet);
-	ftsdc_enable_irq(host, true);
-}
-
-static u32 ftsdc_prepare_data_dma(struct ftsdc_host *host,
-	struct mmc_data *data)
-{
-	struct dma_chan			*chan;
-	struct dma_async_tx_descriptor	*desc;
-	enum dma_transfer_direction	slave_dirn;
-	unsigned int			sglen;
-
-	chan = host->dma.chan;
-	if (!chan)
-		return -ENODEV;
-
-	if (data->flags & MMC_DATA_READ) {
-		host->dma_conf.direction = slave_dirn = DMA_DEV_TO_MEM;
-		host->dma_conf.src_addr = host->mem->start
-			+ SDC_DATA_WINDOW_REG;
-	} else {
-		host->dma_conf.direction = slave_dirn = DMA_MEM_TO_DEV;
-		host->dma_conf.dst_addr = host->mem->start
-			+ SDC_DATA_WINDOW_REG;
-	}
-	sglen = dma_map_sg(chan->device->dev, data->sg,
-			data->sg_len, mmc_get_dma_dir(data));
-	dmaengine_slave_config(chan, &host->dma_conf);
-	desc = dmaengine_prep_slave_sg(chan,
-			data->sg, sglen, slave_dirn,
-			DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-	if (!desc)
-		goto unmap_exit;
-	host->dma.data_desc = desc;
-	desc->callback_result = ftsdc_dma_complete;
-	desc->callback_param = host;
-
-	return 0;
-
-unmap_exit:
-	dma_unmap_sg(chan->device->dev, data->sg, data->sg_len,
-		     mmc_get_dma_dir(data));
-
-	return -ENOMEM;
-}
-
-
-static void
-ftsdc_submit_data_dma(struct ftsdc_host *host)
-{
-	struct dma_chan	*chan = host->dma.chan;
-	struct dma_async_tx_descriptor	*desc = host->dma.data_desc;
-
-	if (chan) {
-		dmaengine_submit(desc);
-		dma_async_issue_pending(chan);
-	}
 }
 
 static void ftsdc_work(struct work_struct *work)
@@ -508,19 +443,47 @@ static void ftsdc_work(struct work_struct *work)
 		container_of(work, struct ftsdc_host, work);
 	struct mmc_data *data = host->mrq->data;
 
+	int rw = (data->flags & MMC_DATA_WRITE) ? 1 : 0;
+
 	ftsdc_enable_irq(host, false);
 	if (host->dodma) {
-		get_data_buffer(host);
-		ftsdc_prepare_data_dma(host, data);
-		ftsdc_submit_data_dma(host);
+		do_dma_access(host);
+		dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
+				     rw ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
 	} else {
 		if (host->buf_active == XFER_WRITE)
 			do_pio_write(host);
 
 		if (host->buf_active == XFER_READ)
 			do_pio_read(host);
-		tasklet_schedule(&host->pio_tasklet);
-		ftsdc_enable_irq(host, true);
+	}
+
+	tasklet_schedule(&host->pio_tasklet);
+	ftsdc_enable_irq(host, true);
+}
+
+static void pio_tasklet(unsigned long data)
+{
+	struct ftsdc_host *host = (struct ftsdc_host *) data;
+
+	if (host->complete_what == COMPLETION_XFER_PROGRESS) {
+		queue_work(mywq, (struct work_struct *)&host->work);
+		return;
+	}
+
+	if (host->complete_what == COMPLETION_FINALIZE) {
+		clear_imask(host);
+		if (host->buf_active != XFER_NONE) {
+			dbg(host, dbg_err, "unfinished %s "
+			    "- buf_count:[%u] buf_bytes:[%u]\n",
+			    (host->buf_active == XFER_READ) ? "read" : "write",
+			    host->buf_count, host->buf_bytes);
+
+			if (host->mrq->data)
+				host->mrq->data->error = -EINVAL;
+		}
+
+		finalize_request(host);
 	}
 }
 
@@ -530,7 +493,6 @@ static void finalize_request(struct ftsdc_host *host)
 	struct mmc_command *cmd;
 	u32 con;
 	int debug_as_failure = 0;
-
 	if (host->complete_what != COMPLETION_FINALIZE)
 		return;
 
@@ -585,7 +547,7 @@ static void finalize_request(struct ftsdc_host *host)
 	if (!mrq->data)
 		goto request_done;
 
-	/* Calculate the amount of bytes transfer if there was no error */
+	/* Calulate the amout of bytes transfer if there was no error */
 	if (mrq->data->error == 0) {
 		mrq->data->bytes_xfered =
 			(mrq->data->blocks * mrq->data->blksz);
@@ -599,29 +561,6 @@ request_done:
 
 	host->last_opcode = mrq->cmd->opcode;
 	mmc_request_done(host->mmc, mrq);
-}
-
-static void pio_tasklet(unsigned long data)
-{
-	struct ftsdc_host *host = (struct ftsdc_host *) data;
-
-	if (host->complete_what == COMPLETION_XFER_PROGRESS) {
-		queue_work(mywq, (struct work_struct *)&host->work);
-		return;
-	}
-
-	if (host->complete_what == COMPLETION_FINALIZE) {
-		clear_imask(host);
-		if (host->buf_active != XFER_NONE) {
-			dbg(host, dbg_err, "unfinished %s buf_count:[%u] buf_bytes:[%u]\n",
-			(host->buf_active == XFER_READ) ? "read" : "write",
-			host->buf_count, host->buf_bytes);
-
-			if (host->mrq->data)
-				host->mrq->data->error = -EINVAL;
-		}
-		finalize_request(host);
-	}
 }
 
 static void ftsdc_send_command(struct ftsdc_host *host,
@@ -655,8 +594,7 @@ static void ftsdc_send_command(struct ftsdc_host *host,
 		ccon |= SDC_CMD_REG_LONG_RSP;
 
 	/* applicatiion specific cmd must follow an MMC_APP_CMD. The
-	 * value will be updated in finalize_request function
-	 */
+	 * value will be updated in finalize_request function */
 	if (host->last_opcode == MMC_APP_CMD)
 		ccon |= SDC_CMD_REG_APP_CMD;
 
@@ -680,24 +618,22 @@ static int ftsdc_setup_data(struct ftsdc_host *host, struct mmc_data *data)
 {
 	u32 dcon, newmask = 0;
 
-	/* configure data transfer parameter */
+	/* configure data transfer paramter */
 	if (!data)
 		return 0;
-	if (host->mmc->card && host->mmc->card->type == (unsigned int)MMC_TYPE_SD) {
+	if(host->mmc->card && host->mmc->card->type==(unsigned int)MMC_TYPE_SD){
 		if (((data->blksz - 1) & data->blksz) != 0) {
-			pr_warn("%s: can't do non-power-of 2 (blksz %d)\n",
-				__func__, data->blksz);
+			pr_warning("%s: can't do non-power-of 2 sized block transfers (blksz %d)\n", __func__, data->blksz);
 			return -EINVAL;
 		}
 	}
 
 	if (data->blksz <= 2) {
 		/* We cannot deal with unaligned blocks with more than
-		 * one block being transferred
-		 */
+		 * one block being transfered. */
+
 		if (data->blocks > 1) {
-			pr_warn("%s: can't do non-word sized (blksz %d)\n",
-				__func__, data->blksz);
+			pr_warning("%s: can't do non-word sized block transfers (blksz %d)\n", __func__, data->blksz);
 			return -EINVAL;
 		}
 	}
@@ -740,10 +676,9 @@ static int ftsdc_setup_data(struct ftsdc_host *host, struct mmc_data *data)
 
 	enable_imask(host, newmask);
 	/* handle sdio */
-	dcon = SDC_SDIO_CTRL1_REG_READ_WAIT_ENABLE
-		& REG_READ(SDC_SDIO_CTRL1_REG);
+	dcon = SDC_SDIO_CTRL1_REG_READ_WAIT_ENABLE & REG_READ(SDC_SDIO_CTRL1_REG);
 	dcon |= data->blksz | data->blocks << 15;
-	if (data->blocks > 1)
+	if (1 < data->blocks)
 		dcon |= SDC_SDIO_CTRL1_REG_SDIO_BLK_MODE;
 	REG_WRITE(dcon, SDC_SDIO_CTRL1_REG);
 
@@ -759,14 +694,27 @@ static int ftsdc_prepare_buffer(struct ftsdc_host *host, struct mmc_data *data)
 	if ((!host->mrq) || (!host->mrq->data))
 		return -EINVAL;
 
-	WARN_ON((data->flags & BOTH_DIR) == BOTH_DIR);
+	BUG_ON((data->flags & BOTH_DIR) == BOTH_DIR);
 	host->buf_sgptr = 0;
 	host->buf_bytes = 0;
 	host->buf_count = 0;
 	host->buf_active = rw ? XFER_WRITE : XFER_READ;
-	if (host->dodma)
-		host->dma_finish = false;
+	if (host->dodma) {
+		u32 dma_len;
+		u32 drb_size;
+		dma_len = dma_map_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
+				     rw ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
+		if (dma_len == 0)
+			return -ENOMEM;
 
+		dmad_config_channel_dir(host->dma_req,
+				rw ? DMAD_DIR_A1_TO_A0 : DMAD_DIR_A0_TO_A1);
+		drb_size = dmad_max_size_per_drb(host->dma_req);
+		if (drb_size < (data->blksz & data->blocks))
+			return -ENODEV;
+
+		host->dma_finish = false;
+	}
 	return 0;
 }
 
@@ -782,8 +730,7 @@ static irqreturn_t ftsdc_irq(int irq, void *dev_id)
 	mci_status = REG_READ(SDC_STATUS_REG);
 	mci_imsk = REG_READ(SDC_INT_MASK_REG);
 
-	dbg(host, dbg_debug, "irq: status:0x%08x, mask : %08x\n",
-		mci_status, mci_imsk);
+	dbg(host, dbg_debug, "irq: status:0x%08x, mask : %08x\n", mci_status, mci_imsk);
 
 	if (mci_status & SDC_STATUS_REG_SDIO_INTR) {
 		if (mci_imsk & SDC_INT_MASK_REG_SDIO_INTR) {
@@ -794,16 +741,20 @@ static irqreturn_t ftsdc_irq(int irq, void *dev_id)
 			return IRQ_HANDLED;
 		}
 	}
+
 	spin_lock_irqsave(&host->complete_lock, iflags);
+
+	mci_status = REG_READ(SDC_STATUS_REG);
 	mci_clear = 0;
+
 	if (mci_status & SDC_STATUS_REG_CARD_CHANGE) {
 		if ((mci_status & SDC_STATUS_REG_CARD_DETECT)
 			== SDC_CARD_INSERT) {
 			host->status = "card insert";
+			mmc_detect_change(host->mmc, msecs_to_jiffies(500));
 		} else {
 			host->status = "card remove";
 		}
-		mmc_detect_change(host->mmc, msecs_to_jiffies(500));
 		mci_clear |= SDC_CLEAR_REG_CARD_CHANGE;
 		dbg(host, dbg_irq, "%s\n", host->status);
 
@@ -860,7 +811,7 @@ static irqreturn_t ftsdc_irq(int irq, void *dev_id)
 
 	if (mci_status & SDC_STATUS_REG_RSP_CRC_FAIL) {
 		mci_clear |= SDC_CLEAR_REG_RSP_CRC_FAIL;
-		/* This is weird hack */
+		/* This is wierd hack */
 		if (cmd->flags & MMC_RSP_CRC) {
 			dbg(host, dbg_err, "CMDSTAT: error RSP CRC\n");
 			cmd->error = -EILSEQ;
@@ -889,8 +840,7 @@ static irqreturn_t ftsdc_irq(int irq, void *dev_id)
 			}
 
 			if (host->buf_active == XFER_WRITE)
-				enable_imask(host,
-				SDC_INT_MASK_REG_FIFO_UNDERRUN);
+				enable_imask(host, SDC_INT_MASK_REG_FIFO_UNDERRUN);
 		} else if (host->complete_what == COMPLETION_RSPFIN) {
 			goto close_transfer;
 		}
@@ -1003,7 +953,6 @@ static int ftsdc_get_cd(struct mmc_host *mmc)
 static void ftsdc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 {
 	struct ftsdc_host *host = mmc_priv(mmc);
-
 	host->status = "mmc request";
 	host->cmd_is_stop = 0;
 	host->mrq = mrq;
@@ -1014,7 +963,7 @@ static void ftsdc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 	} else {
 		ftsdc_send_request(mmc);
 	}
-	dbg(host, dbg_debug, "send request\n");
+	dbg(host, dbg_debug, "send request \n");
 }
 
 static void ftsdc_set_clk(struct ftsdc_host *host, struct mmc_ios *ios)
@@ -1024,7 +973,7 @@ static void ftsdc_set_clk(struct ftsdc_host *host, struct mmc_ios *ios)
 	struct ftsdc_mmc_config *pdata = host->pdev->dev.platform_data;
 	u32 freq = pdata->max_freq;
 
-	dbg(host, dbg_debug, "request clk : %u\n", ios->clock);
+	dbg(host, dbg_debug, "request clk : %u \n", ios->clock);
 	con = REG_READ(SDC_CLOCK_CTRL_REG);
 	if (ios->clock == 0) {
 		host->real_rate = 0;
@@ -1037,11 +986,9 @@ static void ftsdc_set_clk(struct ftsdc_host *host, struct mmc_ios *ios)
 			host->real_rate = freq / ((clk_div+1)<<1);
 		}
 		if (clk_div > 127)
-			dbg(host, dbg_err, "%s: no match clock rate, %u\n",
-			__func__, ios->clock);
+			dbg(host, dbg_err, "%s: no match clock rate, %u\n", __func__, ios->clock);
 
-		con = (con & ~SDC_CLOCK_CTRL_REG_CLK_DIV)
-			| (clk_div & SDC_CLOCK_CTRL_REG_CLK_DIV);
+		con = (con & ~SDC_CLOCK_CTRL_REG_CLK_DIV) | (clk_div & SDC_CLOCK_CTRL_REG_CLK_DIV);
 		con &= ~SDC_CLOCK_CTRL_REG_CLK_DIS;
 	}
 
@@ -1090,8 +1037,9 @@ static void ftsdc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 		con |= SDC_BUS_WIDTH_REG_WIDE_4_BUS;
 	else if (host->bus_width == MMC_BUS_WIDTH_8)
 		con |= SDC_BUS_WIDTH_REG_WIDE_8_BUS;
-	else
+	else {
 		dbg(host, dbg_err, "set_ios: can't support bus mode");
+	}
 	REG_WRITE(con, SDC_BUS_WIDTH_REG);
 
 	/*set rsp and data timeout */
@@ -1105,7 +1053,6 @@ static int ftsdc_get_ro(struct mmc_host *mmc)
 {
 	struct ftsdc_host *host = mmc_priv(mmc);
 	u32 con = REG_READ(SDC_STATUS_REG);
-
 	dbg(host, dbg_debug, "get_ro status:%.8x\n", con);
 
 	return (con & SDC_STATUS_REG_CARD_LOCK) ? 1 : 0;
@@ -1127,18 +1074,18 @@ static void ftsdc_enable_sdio_irq(struct mmc_host *mmc, int enable)
 #ifdef CONFIG_MMC_DEBUG
 	ena = (con & SDC_STATUS_REG_SDIO_INTR) ? 1:0;
 	if (ena == enable)
-		dbg(host, dbg_debug, "ena %.8x %.8x\n", ena, enable);
+		printk("\n*** XXX ***\n");
 #endif
 
-	con = enable ? (con | SDC_STATUS_REG_SDIO_INTR)
-		: (con & ~SDC_STATUS_REG_SDIO_INTR);
+	con = enable ? (con | SDC_STATUS_REG_SDIO_INTR) : (con & ~SDC_STATUS_REG_SDIO_INTR);
 	REG_WRITE(con, SDC_INT_MASK_REG);
 
 #ifdef CONFIG_MMC_DEBUG
 	//check and ensure data out to SD host controller
 	ena = (REG_READ(SDC_INT_MASK_REG) & SDC_STATUS_REG_SDIO_INTR) ? 1:0;
-	if (ena != enable)
-		dbg(host, dbg_debug, "ena %.8x %.8x\n", ena, enable);
+	if (ena != enable) {
+		printk("\n*** YYY ***\n");
+	}
 #endif
 
 	local_irq_restore(flags);
@@ -1158,8 +1105,7 @@ static int ftsdc_state_show(struct seq_file *seq, void *v)
 {
 	struct ftsdc_host *host = seq->private;
 
-	seq_printf(seq, "Register base = 0x%08x\n",
-		(u32)((unsigned long)host->base));
+	seq_printf(seq, "Register base = 0x%08x\n", (u32)((unsigned long)host->base));
 	seq_printf(seq, "Clock rate = %u\n", host->real_rate);
 	seq_printf(seq, "host status = %s\n", host->status);
 	seq_printf(seq, "IRQ = %d\n", host->irq);
@@ -1277,6 +1223,70 @@ static inline void ftsdc_debugfs_remove(struct ftsdc_host *host) { }
 
 #endif /* CONFIG_DEBUG_FS */
 
+#if (defined(CONFIG_PLATFORM_AHBDMA) || defined(CONFIG_PLATFORM_APBDMA))
+static int ftsdc_alloc_dma(struct ftsdc_host *host)
+{
+	dmad_chreq *req = host->dma_req;
+	req = kzalloc(sizeof(dmad_chreq), GFP_KERNEL);
+#ifdef CONFIG_PLATFORM_APBDMA
+	req->apb_req.addr0_ctrl  = APBBR_ADDRINC_FIXED;  /* (in)  APBBR_ADDRINC_xxx */
+/* for amerald */
+#if !defined(CONFIG_PLAT_AE3XX)
+	if((inl(pmu_base) & AMERALD_MASK) == AMERALD_PRODUCT_ID){
+		req->apb_req.addr0_reqn	= APBBR_REQN_SDC_AMERALD;
+	}else
+#endif
+	{
+		req->apb_req.addr0_reqn  = APBBR_REQN_SDC;       /* (in)  APBBR_REQN_xxx (also used to help determine bus selection) */
+	}
+	req->apb_req.addr1_ctrl  = APBBR_ADDRINC_I4X;    /* (in)  APBBR_ADDRINC_xxx */
+	req->apb_req.addr1_reqn  = APBBR_REQN_NONE;      /* (in)  APBBR_REQN_xxx (also used to help determine bus selection) */
+	req->apb_req.burst_mode  = 1;                    /* (in)  Burst mode (0: no burst 1-, 1: burst 4- data cycles per dma cycle) */
+	req->apb_req.data_width  = APBBR_DATAWIDTH_4;    /* (in)  APBBR_DATAWIDTH_4(word), APBBR_DATAWIDTH_2(half-word), APBBR_DATAWIDTH_1(byte) */
+	req->apb_req.tx_dir      = DMAD_DIR_A0_TO_A1;    /* (in)  DMAD_DIR_A0_TO_A1, DMAD_DIR_A1_TO_A0 */
+	req->controller          = DMAD_DMAC_APB_CORE;   /* (in)  DMAD_DMAC_AHB_CORE, DMAD_DMAC_APB_CORE */
+	req->flags               = DMAD_FLAGS_SLEEP_BLOCK | DMAD_FLAGS_BIDIRECTION;
+
+	if (dmad_channel_alloc(req) == 0) {
+		dbg(host, dbg_debug, "%s: APB dma channel allocated (ch: %d)\n", __func__, req->channel);
+		host->dma_req = req;
+		return 0;
+	}
+
+	memset(req, 0, sizeof(dmad_chreq));
+	dbg(host, dbg_info, "%s: APB dma channel allocation failed\n", __func__);
+#endif /* CONFIG_PLATFORM_APBDMA */
+
+#ifdef CONFIG_PLATFORM_AHBDMA
+	req->ahb_req.sync         = 1;                    /* (in)  non-zero if src and dst have different clock domain */
+	req->ahb_req.priority     = DMAC_CSR_CHPRI_1;     /* (in)  DMAC_CSR_CHPRI_0 (lowest) ~ DMAC_CSR_CHPRI_3 (highest) */
+	req->ahb_req.hw_handshake = 1;                    /* (in)  non-zero to enable hardware handshake mode */
+	req->ahb_req.burst_size   = DMAC_CSR_SIZE_4;      /* (in)  DMAC_CSR_SIZE_1 ~ DMAC_CSR_SIZE_256 */
+	req->ahb_req.addr0_width  = DMAC_CSR_WIDTH_32;    /* (in)  DMAC_CSR_WIDTH_8, DMAC_CSR_WIDTH_16, or DMAC_CSR_WIDTH_32 */
+	req->ahb_req.addr0_ctrl   = DMAC_CSR_AD_FIX;      /* (in)  DMAC_CSR_AD_INC, DMAC_CSR_AD_DEC, or DMAC_CSR_AD_FIX */
+	req->ahb_req.addr0_reqn   = DMAC_REQN_SDC;        /* (in)  DMAC_REQN_xxx (also used to help determine channel number) */
+	req->ahb_req.addr1_width  = DMAC_CSR_WIDTH_32;    /* (in)  DMAC_CSR_WIDTH_8, DMAC_CSR_WIDTH_16, or DMAC_CSR_WIDTH_32 */
+	req->ahb_req.addr1_ctrl   = DMAC_CSR_AD_INC;      /* (in)  DMAC_CSR_AD_INC, DMAC_CSR_AD_DEC, or DMAC_CSR_AD_FIX */
+	req->ahb_req.addr1_reqn   = DMAC_REQN_NONE;       /* (in)  DMAC_REQN_xxx (also used to help determine channel number) */
+	req->ahb_req.tx_dir       = DMAD_DIR_A0_TO_A1;    /* (in)  DMAD_DIR_A0_TO_A1, DMAD_DIR_A1_TO_A0 */
+
+	req->controller           = DMAD_DMAC_AHB_CORE;   /* (in)  DMAD_DMAC_AHB_CORE, DMAD_DMAC_APB_CORE */
+	req->flags                = DMAD_FLAGS_SLEEP_BLOCK | DMAD_FLAGS_BIDIRECTION;
+
+	if (dmad_channel_alloc(req) == 0) {
+		dbg(host, dbg_debug, "%s: AHB dma channel allocated (ch: %d)\n", __func__, req->channel);
+		host->dma_req = req;
+		return 0;
+	}
+	dbg(host, dbg_info, "%s: AHB dma channel allocation failed\n", __func__);
+#endif
+
+	kfree(req);
+	return -ENODEV;
+
+}
+#endif
+
 enum {
 	MMC_CTLR_VERSION_1 = 0,
 	MMC_CTLR_VERSION_2,
@@ -1297,7 +1307,11 @@ MODULE_DEVICE_TABLE(platform, ftsdc_mmc_devtype);
 
 static const struct of_device_id ftsdc_mmc_dt_ids[] = {
 	{
-		.compatible = "andestech,atfsdc010g",
+		.compatible = "andestech,atfsdc010",
+		.data = &ftsdc_mmc_devtype[MMC_CTLR_VERSION_1],
+	},
+	{
+		.compatible = "andestech,atfsdc010",
 		.data = &ftsdc_mmc_devtype[MMC_CTLR_VERSION_2],
 	},
 	{},
@@ -1341,6 +1355,9 @@ static struct ftsdc_mmc_config
 		break;
 	default:
 		pdata->wires = 1;
+/*
+		dev_info(&pdev->dev, "Unsupported buswidth, defaulting to 1 bit\n");
+*/
 	}
 nodata:
 	return pdata;
@@ -1375,37 +1392,35 @@ static int __init ftsdc_probe(struct platform_device *pdev)
 	mem_size = resource_size(r);
 	mem = request_mem_region(r->start, mem_size, pdev->name);
 
-	if (!mem) {
+	if (!mem){
 		dev_err(&pdev->dev,
-			"failed to get io memory region resource.\n");
+			"failed to get io memory region resouce.\n");
 		goto probe_out;
 	}
 	ret = -ENOMEM;
 	mmc = mmc_alloc_host(sizeof(struct ftsdc_host), &pdev->dev);
-	if (!mmc)
+	if (!mmc) {
 		goto probe_out;
+	}
 
 	host = mmc_priv(mmc);
-	host->mmc = mmc;
-	host->pdev = pdev;
+	host->mmc 	= mmc;
+	host->pdev	= pdev;
 	mywq = create_workqueue("atcsdc_queue");
-	if (mywq == NULL)
+	if (NULL == mywq)
 		goto probe_free_host;
 
 	spin_lock_init(&host->complete_lock);
 	tasklet_init(&host->pio_tasklet, pio_tasklet, (unsigned long) host);
 	init_completion(&host->dma_complete);
 	INIT_WORK(&host->work, ftsdc_work);
-	host->complete_what = COMPLETION_NONE;
-	host->buf_active = XFER_NONE;
+
+	host->complete_what 	= COMPLETION_NONE;
+	host->buf_active 	= XFER_NONE;
+
 	host->mem = mem;
-#ifdef CONFIG_MMC_FTSDC_DMA
-	ret = ftsdc_configure_dma(host);
-	if (ret)
-		goto probe_free_host;
-#endif
 	host->base = (void __iomem *) ioremap(mem->start, mem_size);
-	if (IS_ERR(host->base)) {
+	if (IS_ERR(host->base)){
 		ret = PTR_ERR(host->base);
 		goto probe_free_mem_region;
 	}
@@ -1414,9 +1429,8 @@ static int __init ftsdc_probe(struct platform_device *pdev)
 	read_fixup = symbol_get(readl_fixup);
 	ret = read_fixup(host->base + SDC_REVISION_REG, 0x00030107, 0);
 	symbol_put(readl_fixup);
-	if (!ret) {
-		dev_err(&pdev->dev,
-			"bitmap revision mismatch(ftsdc)\n");
+	if (!ret){
+		dev_err(&pdev->dev, "failed to read revision reg, bitmap not support ftdsdc\n");
 		goto probe_free_mem_region;
 	}
 
@@ -1435,7 +1449,7 @@ static int __init ftsdc_probe(struct platform_device *pdev)
 	REG_WRITE(con, SDC_INT_MASK_REG);
 
 	con = REG_READ(SDC_BUS_WIDTH_REG);
-	mmc->ops = &ftsdc_ops;
+	mmc->ops 	= &ftsdc_ops;
 	mmc->ocr_avail	= MMC_VDD_32_33 | MMC_VDD_33_34;
 
 	if (con & SDC_WIDE_4_BUS_SUPPORT)
@@ -1443,23 +1457,40 @@ static int __init ftsdc_probe(struct platform_device *pdev)
 	else if (con & SDC_WIDE_8_BUS_SUPPORT)
 		mmc->caps |= MMC_CAP_8_BIT_DATA;
 
+#if (defined(CONFIG_PLATFORM_AHBDMA) || defined(CONFIG_PLATFORM_APBDMA))
+#ifdef CONFIG_MMC_FTSDC_DMA
+	ftsdc_alloc_dma(host);
+#endif
+#endif
+
 #ifndef A320D_BUILDIN_SDC
 	mmc->caps |= MMC_CAP_SDIO_IRQ;
 #endif
-	mmc->f_min = pdata->max_freq / (2 * 128);
-	mmc->f_max = pdata->max_freq / 2;
+	mmc->f_min 	= pdata->max_freq / (2 * 128);
+	mmc->f_max 	= pdata->max_freq / 2;
 	/* limit SDIO mode max size */
-	mmc->max_req_size = 128 * 1024 * 1024 - 1;
-	mmc->max_blk_size = 2047;
-	mmc->max_req_size = (mmc->max_req_size + 1) / (mmc->max_blk_size + 1);
-	mmc->max_seg_size = mmc->max_req_size;
+	mmc->max_req_size	= 128 * 1024 * 1024 - 1;
+	mmc->max_blk_size	= 2047;
+	mmc->max_req_size	= (mmc->max_req_size + 1) / (mmc->max_blk_size + 1);
+	mmc->max_seg_size	= mmc->max_req_size;
 	mmc->max_blk_count = (1<<17)-1;
-	/* set fifo length and default threshold half */
+
+	/* kernel default value. see Doc/block/biodocs.txt */
+	/*
+	 'struct mmc_host' has no member named 'max_phys_segs'
+	 'struct mmc_host' has no member named 'max_hw_segs'
+	*/
+//	mmc->max_phys_segs	= 128;
+//	mmc->max_hw_segs	= 128;
+
+	/* set fifo lenght and default threshold half */
 	con = REG_READ(SDC_FEATURE_REG);
 	host->fifo_len = (con & SDC_FEATURE_REG_FIFO_DEPTH) * sizeof(u32);
+
 	dbg(host, dbg_debug,
 	    "probe: mapped mci_base:%p irq:%u.\n",
 	    host->base, host->irq);
+
 	dbg_dumpregs(host, "");
 	ret = mmc_add_host(mmc);
 	if (ret) {
@@ -1480,8 +1511,6 @@ static int __init ftsdc_probe(struct platform_device *pdev)
 	destroy_workqueue(mywq);
 
  probe_free_host:
-	if (!IS_ERR(host->dma.chan))
-		dma_release_channel(host->dma.chan);
 	mmc_free_host(mmc);
 
  probe_out:
@@ -1506,23 +1535,25 @@ static int __exit ftsdc_remove(struct platform_device *pdev)
 	struct ftsdc_host	*host = mmc_priv(mmc);
 
 	ftsdc_shutdown(pdev);
+
 	tasklet_disable(&host->pio_tasklet);
-	if (!IS_ERR(host->dma.chan))
-		dma_release_channel(host->dma.chan);
+
+	if (ftsdc_dmaexist(host))
+		kfree(host->dma_req);
+
 	free_irq(host->irq, host);
+
 	iounmap(host->base);
 	release_mem_region(host->mem->start, resource_size(host->mem));
-	mmc_free_host(mmc);
 
+	mmc_free_host(mmc);
 	return 0;
 }
 
 #ifdef CONFIG_PM
 static int ftsdc_free_dma(struct ftsdc_host *host)
 {
-	if (!IS_ERR(host->dma.chan))
-		dma_release_channel(host->dma.chan);
-
+	dmad_channel_free(host->dma_req);
 	return 0;
 }
 
@@ -1531,10 +1562,9 @@ static int ftsdc_suspend(struct platform_device *pdev, pm_message_t state)
 	struct mmc_host *mmc = platform_get_drvdata(pdev);
 	struct ftsdc_host *host = mmc_priv(mmc);
 	int ret = 0;
-
-	if (mmc)
+	if (mmc) {
 		ftsdc_free_dma(host);
-
+	}
 	return ret;
 
 }
@@ -1543,11 +1573,11 @@ static int ftsdc_resume(struct platform_device *pdev)
 {
 	struct mmc_host *mmc = platform_get_drvdata(pdev);
 	int ret = 0;
-
+	struct ftsdc_host *host = mmc_priv(mmc);
 	if (mmc) {
-		struct ftsdc_host *host = mmc_priv(mmc);
-
-		ftsdc_configure_dma(host);
+#if (defined(CONFIG_PLATFORM_AHBDMA) || defined(CONFIG_PLATFORM_APBDMA))
+		ftsdc_alloc_dma(host);
+#endif
 	}
 	return ret;
 }
@@ -1559,7 +1589,7 @@ static int ftsdc_resume(struct platform_device *pdev)
 
 static struct platform_driver ftsdc_driver = {
 	.driver	= {
-		.name	= "ftsdc010g",
+		.name	= "ftsdc010",
 		.owner	= THIS_MODULE,
 		.of_match_table = of_match_ptr(ftsdc_mmc_dt_ids),
 	},
@@ -1571,5 +1601,4 @@ static struct platform_driver ftsdc_driver = {
 
 module_platform_driver_probe(ftsdc_driver, ftsdc_probe);
 MODULE_DESCRIPTION("Andestech Leopard MMC/SD Card Interface driver");
-MODULE_AUTHOR("Rick Chen <rick@andestech.com>");
 MODULE_LICENSE("GPL v2");
