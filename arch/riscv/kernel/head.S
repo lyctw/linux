@@ -263,6 +263,7 @@ clear_bss_done:
 	/* Initialize page tables and relocate to virtual addresses */
 	la sp, init_thread_union + THREAD_SIZE
 	mv a0, s1
+	call setup_maxpa
 	call setup_vm
 #ifdef CONFIG_MMU
 	la a0, early_pg_dir

@@ -14,6 +14,7 @@ config RISCV
 	def_bool y
 	select ARCH_CLOCKSOURCE_INIT
 	select ARCH_SUPPORTS_ATOMIC_RMW
+	select PHYS_ADDR_T_64BIT
 	select ARCH_HAS_BINFMT_FLAT
 	select ARCH_HAS_DEBUG_VM_PGTABLE
 	select ARCH_HAS_DEBUG_VIRTUAL if MMU
@@ -88,6 +89,9 @@ config RISCV
 	select SYSCTL_EXCEPTION_TRACE
 	select THREAD_INFO_IN_TASK
 	select UACCESS_MEMCPY if !MMU
+	select ARCH_HAS_SETUP_DMA_OPS
+	select ARCH_HAS_SYNC_DMA_FOR_CPU
+	select ARCH_HAS_SYNC_DMA_FOR_DEVICE
 
 config ARCH_MMAP_RND_BITS_MIN
 	default 18 if 64BIT
@@ -204,6 +208,7 @@ source "arch/riscv/Kconfig.socs"
 
 menu "Platform type"
 
+source "arch/riscv/platforms/Kconfig"
 choice
 	prompt "Base ISA"
 	default ARCH_RV64I
