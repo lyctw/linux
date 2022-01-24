@@ -15,12 +15,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifdef __LP64__
 #define __ARCH_WANT_NEW_STAT
 #define __ARCH_WANT_SET_GET_RLIMIT
-#endif /* __LP64__ */
-
+#define __ARCH_WANT_SYS_NEWFSTATAT
 #define __ARCH_WANT_SYS_CLONE3
+#define __ARCH_WANT_TIME32_SYSCALLS
+#define __ARCH_WANT_STAT64
 
 #include <asm-generic/unistd.h>
 
