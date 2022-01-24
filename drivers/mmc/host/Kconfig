@@ -503,7 +503,7 @@ config MMC_OMAP_HS
 
 config MMC_WBSD
 	tristate "Winbond W83L51xD SD/MMC Card Interface support"
-	depends on ISA_DMA_API && !M68K
+	depends on ISA_DMA_API
 	help
 	  This selects the Winbond(R) W83L51xD Secure digital and
 	  Multimedia card Interface.
@@ -607,6 +607,15 @@ config MMC_DAVINCI
 	  This selects the TI DAVINCI Multimedia card Interface.
 	  If you have an DAVINCI board with a Multimedia Card slot,
 	  say Y or M here.  If unsure, say N.
+
+config MMC_FTSDC
+	tristate "Andestech SDC Multimedia Card Interface support"
+	depends on RISCV
+	help
+	  This selects the TI DAVINCI Multimedia card Interface.
+	  If you have an DAVINCI board with a Multimedia Card slot,
+	  say Y or M here.  If unsure, say N.
+
 
 config MMC_GOLDFISH
 	tristate "goldfish qemu Multimedia Card Interface support"
