@@ -18,6 +18,7 @@
 #include <asm/ptrace.h>
 #include <asm/csr.h>
 
+#ifdef CONFIG_FPU
 extern void __fstate_save(struct task_struct *save_to);
 extern void __fstate_restore(struct task_struct *restore_from);
 
@@ -44,25 +45,56 @@ static inline void fstate_restore(struct task_struct *task,
 	}
 }
 
+extern bool has_fpu;
+#else
+#define has_fpu false
+#define fstate_save(task, regs) do { } while (0)
+#define fstate_restore(task, regs) do { } while (0)
+#endif
+
+#ifdef CONFIG_DSP
+static inline void dspstate_save(struct task_struct *task)
+{
+	task->thread.dspstate.ucode = csr_read(ucode);
+}
+static inline void dspstate_restore(struct task_struct *task)
+{
+	csr_write(ucode, task->thread.dspstate.ucode);
+}
+extern bool has_dsp;
+#else
+#define has_dsp false
+#define dspstate_save(task, regs) do { } while (0)
+#define dspstate_restore(task, regs) do { } while (0)
+#endif
+
+extern struct task_struct *__switch_to(struct task_struct *,
+				       struct task_struct *);
+
 static inline void __switch_to_aux(struct task_struct *prev,
 				   struct task_struct *next)
 {
+#ifdef CONFIG_FPU
 	struct pt_regs *regs;
-
 	regs = task_pt_regs(prev);
 	if (unlikely(regs->sstatus & SR_SD))
 		fstate_save(prev, regs);
 	fstate_restore(next, task_pt_regs(next));
+#endif
+#ifdef CONFIG_DSP
+	if (likely(has_dsp)) {
+		dspstate_save(prev);
+		dspstate_restore(next);
+	}
+#endif
 }
-
-extern struct task_struct *__switch_to(struct task_struct *,
-				       struct task_struct *);
 
 #define switch_to(prev, next, last)			\
 do {							\
 	struct task_struct *__prev = (prev);		\
 	struct task_struct *__next = (next);		\
-	__switch_to_aux(__prev, __next);		\
+	if (has_fpu || has_dsp)				\
+		__switch_to_aux(__prev, __next);	\
 	((last) = __switch_to(__prev, __next));		\
 } while (0)
 

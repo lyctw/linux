@@ -22,7 +22,7 @@
  * This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
  */
-#define TASK_UNMAPPED_BASE	PAGE_ALIGN(TASK_SIZE >> 1)
+#define TASK_UNMAPPED_BASE	PAGE_ALIGN(TASK_SIZE / 3)
 
 #define STACK_TOP		TASK_SIZE
 #define STACK_TOP_MAX		STACK_TOP
@@ -46,6 +46,9 @@ struct thread_struct {
 	unsigned long sp;	/* Kernel mode stack */
 	unsigned long s[12];	/* s[0]: frame pointer */
 	struct __riscv_d_ext_state fstate;
+#ifdef CONFIG_DSP
+	struct __riscv_dsp_state dspstate;
+#endif
 };
 
 #define INIT_THREAD {					\
@@ -91,6 +94,9 @@ struct device_node;
 extern int riscv_of_processor_hart(struct device_node *node);
 
 extern void riscv_fill_hwcap(void);
+#ifdef CONFIG_ARCH_BINFMT_ELF_STATE
+extern unsigned int elf_attribute_checking;
+#endif
 
 #endif /* __ASSEMBLY__ */
 

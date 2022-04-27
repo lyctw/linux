@@ -19,6 +19,8 @@
 #undef flush_icache_range
 #undef flush_icache_user_range
 #undef flush_dcache_page
+#undef flush_cache_vmap
+#undef flush_cache_vunmap
 
 static inline void local_flush_icache_all(void)
 {
@@ -33,12 +35,15 @@ static inline void flush_dcache_page(struct page *page)
 		clear_bit(PG_dcache_clean, &page->flags);
 }
 
-/*
- * RISC-V doesn't have an instruction to flush parts of the instruction cache,
- * so instead we just flush the whole thing.
- */
-#define flush_icache_range(start, end) flush_icache_all()
-#define flush_icache_user_range(vma, pg, addr, len) flush_icache_all()
+static inline void flush_cache_vmap(unsigned long start, unsigned long end)
+{
+	local_flush_tlb_all();
+}
+
+static inline void flush_cache_vunmap(unsigned long start, unsigned long end)
+{
+	local_flush_tlb_all();
+}
 
 #ifndef CONFIG_SMP
 
@@ -51,6 +56,13 @@ static inline void flush_dcache_page(struct page *page)
 void flush_icache_mm(struct mm_struct *mm, bool local);
 
 #endif /* CONFIG_SMP */
+
+/*
+ * RISC-V doesn't have an instruction to flush parts of the instruction cache,
+ * so instead we just flush the whole thing.
+ */
+#define flush_icache_range(start, end) flush_icache_all()
+#define flush_icache_user_range(vma, pg, addr, len) flush_icache_all()
 
 /*
  * Bits in sys_riscv_flush_icache()'s flags argument.

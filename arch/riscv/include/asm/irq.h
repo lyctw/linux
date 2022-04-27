@@ -15,11 +15,21 @@
 #ifndef _ASM_RISCV_IRQ_H
 #define _ASM_RISCV_IRQ_H
 
-#define NR_IRQS         0
+#define NR_IRQS	72
+
+/*
+ *  * Use this value to indicate lack of interrupt
+ *   * capability
+ *    */
+#ifndef NO_IRQ
+#define NO_IRQ  ((unsigned int)(-1))
+#endif
+
 
 #define INTERRUPT_CAUSE_SOFTWARE    1
 #define INTERRUPT_CAUSE_TIMER       5
 #define INTERRUPT_CAUSE_EXTERNAL    9
+#define INTERRUPT_CAUSE_PMU        274
 
 void riscv_timer_interrupt(void);
 

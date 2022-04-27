@@ -137,6 +137,7 @@ struct dma_map_ops {
 };
 
 extern const struct dma_map_ops dma_direct_ops;
+extern const struct dma_map_ops dma_noncoherent_ops;
 extern const struct dma_map_ops dma_virt_ops;
 
 #define DMA_BIT_MASK(n)	(((n) == 64) ? ~0ULL : ((1ULL<<(n))-1))
@@ -502,7 +503,7 @@ dma_get_sgtable_attrs(struct device *dev, struct sg_table *sgt, void *cpu_addr,
 #define dma_get_sgtable(d, t, v, h, s) dma_get_sgtable_attrs(d, t, v, h, s, 0)
 
 #ifndef arch_dma_alloc_attrs
-#define arch_dma_alloc_attrs(dev, flag)	(true)
+#define arch_dma_alloc_attrs(dev)	(true)
 #endif
 
 static inline void *dma_alloc_attrs(struct device *dev, size_t size,
@@ -521,7 +522,7 @@ static inline void *dma_alloc_attrs(struct device *dev, size_t size,
 	/* let the implementation decide on the zone to allocate from: */
 	flag &= ~(__GFP_DMA | __GFP_DMA32 | __GFP_HIGHMEM);
 
-	if (!arch_dma_alloc_attrs(&dev, &flag))
+	if (!arch_dma_alloc_attrs(&dev))
 		return NULL;
 	if (!ops->alloc)
 		return NULL;
@@ -839,7 +840,7 @@ static inline int dma_mmap_wc(struct device *dev,
 #define dma_mmap_writecombine dma_mmap_wc
 #endif
 
-#if defined(CONFIG_NEED_DMA_MAP_STATE) || defined(CONFIG_DMA_API_DEBUG)
+#ifdef CONFIG_NEED_DMA_MAP_STATE
 #define DEFINE_DMA_UNMAP_ADDR(ADDR_NAME)        dma_addr_t ADDR_NAME
 #define DEFINE_DMA_UNMAP_LEN(LEN_NAME)          __u32 LEN_NAME
 #define dma_unmap_addr(PTR, ADDR_NAME)           ((PTR)->ADDR_NAME)

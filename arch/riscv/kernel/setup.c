@@ -22,6 +22,7 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/memblock.h>
+#include <linux/bootmem.h>
 #include <linux/sched.h>
 #include <linux/initrd.h>
 #include <linux/console.h>
@@ -29,6 +30,7 @@
 #include <linux/of_fdt.h>
 #include <linux/of_platform.h>
 #include <linux/sched/task.h>
+#include <linux/swiotlb.h>
 
 #include <asm/setup.h>
 #include <asm/sections.h>
@@ -37,6 +39,29 @@
 #include <asm/sbi.h>
 #include <asm/tlbflush.h>
 #include <asm/thread_info.h>
+#include <asm/csr.h>
+#include <asm/kasan.h>
+
+#ifdef CONFIG_EARLY_PRINTK
+static void sbi_console_write(struct console *co, const char *buf,
+			      unsigned int n)
+{
+	int i;
+
+	for (i = 0; i < n; ++i) {
+		if (buf[i] == '\n')
+			sbi_console_putchar('\r');
+		sbi_console_putchar(buf[i]);
+	}
+}
+
+struct console riscv_sbi_early_console_dev __initdata = {
+	.name	= "early",
+	.write	= sbi_console_write,
+	.flags	= CON_PRINTBUFFER | CON_BOOT | CON_ANYTIME,
+	.index	= -1
+};
+#endif
 
 #ifdef CONFIG_DUMMY_CONSOLE
 struct screen_info screen_info = {
@@ -59,6 +84,7 @@ EXPORT_SYMBOL(empty_zero_page);
 
 /* The lucky hart to first increment this variable will boot the other cores */
 atomic_t hart_lottery;
+static DEFINE_PER_CPU(struct cpu, cpu_devices);
 
 #ifdef CONFIG_BLK_DEV_INITRD
 static void __init setup_initrd(void)
@@ -103,7 +129,18 @@ pgd_t trampoline_pg_dir[PTRS_PER_PGD] __initdata __aligned(PAGE_SIZE);
 pmd_t swapper_pmd[PTRS_PER_PMD*((-PAGE_OFFSET)/PGDIR_SIZE)] __page_aligned_bss;
 pmd_t trampoline_pmd[PTRS_PER_PGD] __initdata __aligned(PAGE_SIZE);
 #endif
-
+phys_addr_t pa_msb;
+asmlinkage void __init setup_maxpa(void)
+{
+#ifdef CONFIG_PMA
+	if (sbi_probe_pma()) {
+		pa_msb = 0;
+		return;
+	}
+#endif
+	csr_write(satp, SATP_PPN);
+	pa_msb = (csr_read(satp) + 1) >>1;
+}
 asmlinkage void __init setup_vm(void)
 {
 	extern char _start;
@@ -117,6 +154,9 @@ asmlinkage void __init setup_vm(void)
 	/* Sanity check alignment and size */
 	BUG_ON((PAGE_OFFSET % PGDIR_SIZE) != 0);
 	BUG_ON((pa % (PAGE_SIZE * PTRS_PER_PTE)) != 0);
+#ifdef CONFIG_HIGHMEM
+	BUG_ON((LOWMEM_SIZE % PGDIR_SIZE) != 0);
+#endif
 
 #ifndef __PAGETABLE_PMD_FOLDED
 	trampoline_pg_dir[(PAGE_OFFSET >> PGDIR_SHIFT) % PTRS_PER_PGD] =
@@ -124,8 +164,13 @@ asmlinkage void __init setup_vm(void)
 			__pgprot(_PAGE_TABLE));
 	trampoline_pmd[0] = pfn_pmd(PFN_DOWN(pa), prot);
 
+#ifndef CONFIG_HIGHMEM
 	for (i = 0; i < (-PAGE_OFFSET)/PGDIR_SIZE; ++i) {
+#else
+	for (i = 0; i < (LOWMEM_SIZE)/PGDIR_SIZE; ++i) {
+#endif
 		size_t o = (PAGE_OFFSET >> PGDIR_SHIFT) % PTRS_PER_PGD + i;
+
 		swapper_pg_dir[o] =
 			pfn_pgd(PFN_DOWN((uintptr_t)swapper_pmd) + i,
 				__pgprot(_PAGE_TABLE));
@@ -135,8 +180,11 @@ asmlinkage void __init setup_vm(void)
 #else
 	trampoline_pg_dir[(PAGE_OFFSET >> PGDIR_SHIFT) % PTRS_PER_PGD] =
 		pfn_pgd(PFN_DOWN(pa), prot);
-
+#ifndef CONFIG_HIGHMEM
 	for (i = 0; i < (-PAGE_OFFSET)/PGDIR_SIZE; ++i) {
+#else
+	for (i = 0; i < (LOWMEM_SIZE)/PGDIR_SIZE; ++i) {
+#endif
 		size_t o = (PAGE_OFFSET >> PGDIR_SHIFT) % PTRS_PER_PGD + i;
 		swapper_pg_dir[o] =
 			pfn_pgd(PFN_DOWN(pa + i * PGDIR_SIZE), prot);
@@ -165,14 +213,23 @@ static void __init setup_bootmem(void)
 			 * the kernel
 			 */
 			memblock_reserve(reg->base, vmlinux_end - reg->base);
+#ifdef CONFIG_HIGHMEM
+			mem_size = reg->size;
+#else
 			mem_size = min(reg->size, (phys_addr_t)-PAGE_OFFSET);
+#endif
 		}
 	}
 	BUG_ON(mem_size == 0);
 
 	set_max_mapnr(PFN_DOWN(mem_size));
-	max_low_pfn = pfn_base + PFN_DOWN(mem_size);
-
+#ifdef CONFIG_HIGHMEM
+	max_low_pfn = LOWMEM_END_PFN ;
+	 max_pfn	= PFN_DOWN(memblock_end_of_DRAM());
+	 memblock_set_current_limit(__pa(LOWMEM_END));
+#else
+	max_low_pfn = PFN_DOWN(memblock_end_of_DRAM());
+#endif
 #ifdef CONFIG_BLK_DEV_INITRD
 	setup_initrd();
 #endif /* CONFIG_BLK_DEV_INITRD */
@@ -194,6 +251,12 @@ static void __init setup_bootmem(void)
 
 void __init setup_arch(char **cmdline_p)
 {
+#if defined(CONFIG_EARLY_PRINTK)
+       if (likely(early_console == NULL)) {
+               early_console = &riscv_sbi_early_console_dev;
+               register_console(early_console);
+       }
+#endif
 	*cmdline_p = boot_command_line;
 
 	parse_early_param();
@@ -206,6 +269,13 @@ void __init setup_arch(char **cmdline_p)
 	setup_bootmem();
 	paging_init();
 	unflatten_device_tree();
+#ifdef CONFIG_SWIOTLB
+	swiotlb_init(1);
+#endif
+
+#ifdef CONFIG_KASAN
+	kasan_init();
+#endif
 
 #ifdef CONFIG_SMP
 	setup_smp();
@@ -217,6 +287,22 @@ void __init setup_arch(char **cmdline_p)
 
 	riscv_fill_hwcap();
 }
+
+static int __init topology_init(void)
+{
+	int i;
+
+	for_each_possible_cpu(i) {
+		struct cpu *cpu = &per_cpu(cpu_devices, i);
+#ifdef CONFIG_HOTPLUG_CPU
+		cpu->hotpluggable = 1;
+#endif
+		register_cpu(cpu, i);
+	}
+
+	return 0;
+}
+subsys_initcall(topology_init);
 
 static int __init riscv_device_init(void)
 {

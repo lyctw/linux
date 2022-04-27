@@ -48,8 +48,17 @@ ENTRY(_start)
 	mv s0, a0
 	mv s1, a1
 
+clear_bss:
+	la a0, __bss_start
+	la a1, __bss_stop
+clbss_l:
+	REG_S zero, 0(a0)
+	addi a0, a0, SZREG
+	blt a0, a1, clbss_l
+
 	/* Initialize page tables and relocate to virtual addresses */
 	la sp, init_thread_union + THREAD_SIZE
+	call setup_maxpa
 	call setup_vm
 	call relocate
 
@@ -60,6 +69,10 @@ ENTRY(_start)
 	la sp, init_thread_union
 	li a0, ASM_THREAD_SIZE
 	add sp, sp, a0
+
+#ifdef CONFIG_KASAN
+	call kasan_early_init
+#endif
 
 	/* Start the kernel */
 	mv a0, s0
@@ -94,6 +107,8 @@ relocate:
 	or a0, a0, a1
 	sfence.vma
 	csrw sptbr, a0
+
+.align 2
 1:
 	/* Set trap vector to spin forever to help debug */
 	la a0, .Lsecondary_park
@@ -143,11 +158,26 @@ relocate:
 	tail smp_callin
 #endif
 
+.align 2
 .Lsecondary_park:
 	/* We lack SMP support or have too many harts, so park this hart */
 	wfi
 	j .Lsecondary_park
 END(_start)
+
+.section .text
+.global boot_sec_cpu
+
+#ifdef CONFIG_SMP
+boot_sec_cpu:
+	/* clear all pending flags */
+	csrw sip, zero
+	/* Mask all interrupts */
+	csrw sie, zero
+	fence
+
+	tail smp_callin
+#endif
 
 __PAGE_ALIGNED_BSS
 	/* Empty zero page */

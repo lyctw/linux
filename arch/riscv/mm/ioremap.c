@@ -18,7 +18,7 @@
 #include <linux/io.h>
 
 #include <asm/pgtable.h>
-
+#include <asm/sbi.h>
 /*
  * Remap an arbitrary physical address space into the kernel virtual
  * address space. Needed when the kernel wants to access high addresses
@@ -42,7 +42,7 @@ static void __iomem *__ioremap_caller(phys_addr_t addr, size_t size,
 
 	/* Page-align mappings */
 	offset = addr & (~PAGE_MASK);
-	addr &= PAGE_MASK;
+	addr -= offset;
 	size = PAGE_ALIGN(size + offset);
 
 	area = get_vm_area_caller(size, VM_IOREMAP, caller);
@@ -71,13 +71,48 @@ static void __iomem *__ioremap_caller(phys_addr_t addr, size_t size,
  *
  * Must be freed with iounmap.
  */
-void __iomem *ioremap(phys_addr_t offset, unsigned long size)
+
+#ifdef CONFIG_PMA
+#define MAX_PMA 16
+unsigned long pma_used[MAX_PMA];
+#endif
+
+void __iomem *ioremap(phys_addr_t offset, size_t size)
 {
 	return __ioremap_caller(offset, size, PAGE_KERNEL,
 		__builtin_return_address(0));
 }
 EXPORT_SYMBOL(ioremap);
 
+void __iomem *ioremap_nocache(phys_addr_t offset, size_t size)
+{
+	void __iomem *ret;
+	int i;
+
+	pgprot_t pgprot = pgprot_noncached(PAGE_KERNEL);
+	ret =  __ioremap_caller(offset, size, pgprot,
+		__builtin_return_address(0));
+#ifdef CONFIG_PMA
+	if(!pa_msb){    // PMA enable --> pa_msb==0 --> sbi_set_pma()
+		/* Start to setting PMA */
+		/* Check whether the value of size is power of 2 */
+		if ((size & (size-1)) != 0) {
+			printk("The value of size is not power of 2\n");
+			BUG();
+		}
+		/* Setting PMA register */
+		for (i = 0; i < MAX_PMA; i++) {
+			if (!pma_used[i]) {
+				pma_used[i] = (unsigned long)ret;
+				break;
+			}
+		}
+		sbi_set_pma(offset, (unsigned long)ret, size);
+	}
+#endif
+	return ret;
+}
+EXPORT_SYMBOL(ioremap_nocache);
 
 /**
  * iounmap - Free a IO remapping
@@ -87,6 +122,20 @@ EXPORT_SYMBOL(ioremap);
  */
 void iounmap(volatile void __iomem *addr)
 {
+	int i;
+
 	vunmap((void *)((unsigned long)addr & PAGE_MASK));
+#ifdef CONFIG_PMA
+	if(!pa_msb){
+		/* Free PMA regitser */
+		for (i = 0; i < MAX_PMA; i++) {
+			if (pma_used[i] == (unsigned long)addr) {
+				pma_used[i] = 0;
+				sbi_free_pma((unsigned long)addr);
+				break;
+			}
+		}
+	}
+#endif
 }
 EXPORT_SYMBOL(iounmap);

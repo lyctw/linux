@@ -54,6 +54,7 @@ SECTIONS
 		KPROBES_TEXT
 		ENTRY_TEXT
 		IRQENTRY_TEXT
+		SOFTIRQENTRY_TEXT
 		*(.fixup)
 		_etext = .;
 	}
@@ -74,7 +75,7 @@ SECTIONS
 		*(.sbss*)
 	}
 
-	BSS_SECTION(0, 0, 0)
+	BSS_SECTION(0x10, 0, 0)
 
 	EXCEPTION_TABLE(0x10)
 	NOTES

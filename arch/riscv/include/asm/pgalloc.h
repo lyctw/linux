@@ -26,6 +26,8 @@ static inline void pmd_populate_kernel(struct mm_struct *mm,
 	set_pmd(pmd, __pmd((pfn << _PAGE_PFN_SHIFT) | _PAGE_TABLE));
 }
 
+int get_cache_line_size(void);
+void cpu_dma_wb_range(unsigned long start, unsigned long end);
 static inline void pmd_populate(struct mm_struct *mm,
 	pmd_t *pmd, pgtable_t pte)
 {
@@ -56,6 +58,7 @@ static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 		memcpy(pgd + USER_PTRS_PER_PGD,
 			init_mm.pgd + USER_PTRS_PER_PGD,
 			(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
+		flush_tlb_all();
 	}
 	return pgd;
 }

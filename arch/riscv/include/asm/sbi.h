@@ -25,6 +25,20 @@
 #define SBI_REMOTE_SFENCE_VMA 6
 #define SBI_REMOTE_SFENCE_VMA_ASID 7
 #define SBI_SHUTDOWN 8
+#define SBI_TRIGGER 9
+#define SBI_SET_PFM 10
+#define SBI_READ_POWERBRAKE 11
+#define SBI_WRITE_POWERBRAKE 12
+#define SBI_SUSPEND_PREPARE 13
+#define SBI_SUSPEND_MEM 14
+#define SBI_DCACHE_OP 15
+#define SBI_ICACHE_OP 16
+#define SBI_L1CACHE_STATUS 17
+#define SBI_RESTART 18
+#define SBI_SET_RESET_VEC 19
+#define SBI_SET_PMA 20
+#define SBI_FREE_PMA 21
+#define SBI_PROBE_PMA 22
 
 #define SBI_CALL(which, arg0, arg1, arg2) ({			\
 	register uintptr_t a0 asm ("a0") = (uintptr_t)(arg0);	\
@@ -42,6 +56,48 @@
 #define SBI_CALL_0(which) SBI_CALL(which, 0, 0, 0)
 #define SBI_CALL_1(which, arg0) SBI_CALL(which, arg0, 0, 0)
 #define SBI_CALL_2(which, arg0, arg1) SBI_CALL(which, arg0, arg1, 0)
+#define SBI_CALL_3(which, arg0, arg1, arg2) SBI_CALL(which, arg0, arg1, arg2)
+
+static inline bool sbi_probe_pma(void)
+{
+	return SBI_CALL_0(SBI_PROBE_PMA);
+}
+
+static inline void sbi_set_pma(phys_addr_t offset, unsigned long vaddr,
+			       size_t size)
+{
+	SBI_CALL_3(SBI_SET_PMA, offset, vaddr, size);
+}
+
+static inline void sbi_free_pma(unsigned long vaddr)
+{
+	SBI_CALL_1(SBI_FREE_PMA, vaddr);
+}
+
+static inline void sbi_set_reset_vec(int val)
+{
+	SBI_CALL_1(SBI_SET_RESET_VEC, val);
+}
+
+static inline void sbi_restart(int val)
+{
+	SBI_CALL_1(SBI_RESTART, val);
+}
+
+static inline void sbi_write_powerbrake(int val)
+{
+	SBI_CALL_1(SBI_WRITE_POWERBRAKE, val);
+}
+
+static inline int sbi_read_powerbrake(void)
+{
+	return SBI_CALL_0(SBI_READ_POWERBRAKE);
+}
+
+static inline void sbi_set_trigger(unsigned int type, uintptr_t data, int enable)
+{
+	SBI_CALL_3(SBI_TRIGGER, type, data, enable);
+}
 
 static inline void sbi_console_putchar(int ch)
 {
