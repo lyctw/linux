@@ -1,0 +1,11 @@
+
+config CANAAN_MEMORY_CMA
+        tristate "Canaan memory driver(cma version)"
+        depends on CMA 
+        help
+          Say Y for enabling the k510 shared memory management driver using cma
+
+          To compile this support as a module, choose M here:
+          The module will be called allegro_encoder.
+          If unsure, say N.
+

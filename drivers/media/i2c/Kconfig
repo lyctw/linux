@@ -583,6 +583,23 @@ config VIDEO_IMX274
 	  This is a V4L2 sensor-level driver for the Sony IMX274
 	  CMOS image sensor.
 
+config VIDEO_IMX219
+	tristate "Sony IMX219 sensor support"
+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	depends on MEDIA_CAMERA_SUPPORT
+	---help---
+	  This is a V4L2 sensor-level driver for the Sony IMX219
+	  CMOS image sensor.
+
+config VIDEO_IMX385
+	tristate "Sony IMX385 sensor support"
+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	depends on MEDIA_CAMERA_SUPPORT
+	---help---
+	  This is a V4L2 sensor-level driver for the Sony IMX385
+	  CMOS image sensor.
+
+
 config VIDEO_OV2640
 	tristate "OmniVision OV2640 sensor support"
 	depends on VIDEO_V4L2 && I2C

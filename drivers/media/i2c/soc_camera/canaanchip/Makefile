@@ -1,0 +1,3 @@
+obj-$(CONFIG_VIDEO_IMX219_0)	+= imx219_0.o
+obj-$(CONFIG_VIDEO_IMX219_1)	+= imx219_1.o
+obj-$(CONFIG_VIDEO_IMX385)	+= imx385.o

@@ -1,0 +1,232 @@
+/* Copyright (c) 2022, Canaan Bright Sight Co., Ltd
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+*/
+/**
+ * @file
+ * @brief      MUXPIN
+ *
+ *             MUXPIN supports the following features:
+ *
+ *             - Field Programmable GPIO Array (FPIOA)
+ *
+ *             - 110 LSIO with 256 functions
+ *
+ *             - Schmitt trigger
+ *
+ *             - Pull up and pull down
+ *
+ *             - Driving selector
+ *
+ *             - Static input and output
+ *
+ */
+
+/*
+ * NOTE: This file is automatic generated, do not edit directly.
+ * Please edit the generator instead.
+ */
+
+#ifndef _DRIVER_MUXPIN_H
+#define _DRIVER_MUXPIN_H
+
+#include <linux/types.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* clang-format off */
+/* Pad number settings */
+#define LSIO_FUNC_NUM_IO    (108)
+#define MUXPIN_NUM_IO    (128)
+#define MUXPIN_FUCTION_MASK  (0x0000FFFFU)
+#define MUXPIN_IONUM_MASK    (0xFFFF0000U)
+
+/* clang-format on */
+
+/**
+ * @brief      FPIOA IO functions
+ *
+ * @note       FPIOA pin function table
+ *
+ * | Function  | Name                             | Description                       |
+ * |-----------|----------------------------------|-----------------------------------|
+{{#fpioa}}
+ * | {{func_number}} | {{format_func_name}} | {{format_func_desc}}  |
+{{/fpioa}}
+ *
+ * Any IO of FPIOA is a IO-function matrix.
+ * The upper 32bit is IO number for high speed pin,
+ * Because the high speed pin corresponds to a unique IO.
+ * All IO have default reset function, after reset, re-configure
+ * IO function is required.
+ */
+
+/* clang-format off */
+typedef enum muxpin_function_e {
+{{#fpioa}}
+	FUNC_{{format_func_name}} = ({{IO_PIN_NUM}} << 16) | {{func_number}},	/*!< {{format_func_desc}} */
+{{/fpioa}}
+} muxpin_function_t;
+/* clang-format on */
+
+/**
+ * @brief      FPIOA pull settings
+ *
+ * @note       FPIOA pull settings description
+ *
+ * | PU  | PD  | Description                       |
+ * |-----|-----|-----------------------------------|
+ * | 0   | 0   | No Pull                           |
+ * | 0   | 1   | Pull Down                         |
+ * | 1   | 0   | Pull Up                           |
+ * | 1   | 1   | Undefined                         |
+ *
+ */
+
+/* clang-format off */
+typedef enum muxpin_pull_e {
+	MUXPIN_PULL_NONE,      /*!< No Pull */
+	MUXPIN_PULL_DOWN,      /*!< Pull Down */
+	MUXPIN_PULL_UP,        /*!< Pull Up */
+	MUXPIN_PULL_MAX        /*!< Count of pull settings */
+} muxpin_pull_t;
+/* clang-format on */
+
+/**
+ * @brief      FPIOA driving settings
+ *
+ * @note       FPIOA driving settings description
+ *             There are 16 kinds of driving settings
+ *
+ * @note       Low Level Output Current
+ *
+ * |DS[3:0] |Min(mA)|Typ(mA)|Max(mA)|
+ * |--------|-------|-------|-------|
+ * |0000    |3.2    |5.4    |8.3    |
+ * |0001    |4.7    |8.0    |12.3   |
+ * |0010    |6.3    |10.7   |16.4   |
+ * |0011    |7.8    |13.2   |20.2   |
+ * |0100    |9.4    |15.9   |24.2   |
+ * |0101    |10.9   |18.4   |28.1   |
+ * |0110    |12.4   |20.9   |31.8   |
+ * |0111    |13.9   |23.4   |35.5   |
+ *
+ * @note       High Level Output Current
+ *
+ * |DS[3:0] |Min(mA)|Typ(mA)|Max(mA)|
+ * |--------|-------|-------|-------|
+ * |0000    |5.0    |7.6    |11.2   |
+ * |0001    |7.5    |11.4   |16.8   |
+ * |0010    |10.0   |15.2   |22.3   |
+ * |0011    |12.4   |18.9   |27.8   |
+ * |0100    |14.9   |22.6   |33.3   |
+ * |0101    |17.4   |26.3   |38.7   |
+ * |0110    |19.8   |30.0   |44.1   |
+ * |0111    |22.3   |33.7   |49.5   |
+ *
+ */
+
+/* clang-format off */
+typedef enum muxpin_driving_e {
+	MUXPIN_DRIVING_0,      /*!< 000 */
+	MUXPIN_DRIVING_1,      /*!< 001 */
+	MUXPIN_DRIVING_2,      /*!< 010 */
+	MUXPIN_DRIVING_3,      /*!< 011 */
+	MUXPIN_DRIVING_4,      /*!< 100 */
+	MUXPIN_DRIVING_5,      /*!< 101 */
+	MUXPIN_DRIVING_6,      /*!< 110 */
+	MUXPIN_DRIVING_7,      /*!< 111 */
+	MUXPIN_DRIVING_MAX     /*!< Count of driving settings */
+} muxpin_driving_t;
+/* clang-format on */
+
+/**
+ * @brief      FPIOA IO
+ *
+ *             FPIOA IO is the specific pin of the chip package. Every IO
+ *             has a 32bit width register that can independently implement
+ *             schmitt trigger, invert input, invert output, strong pull
+ *             up, driving selector, static input and static output. And more,
+ *             it can implement any pin of any peripheral devices.
+ *
+ * @note       FPIOA IO's register bits Layout
+ *
+ * | Bits      | Name     |Description                                        |
+ * |-----------|----------|---------------------------------------------------|
+ * | 31        | PAD_DI   | Read current IO's data input.                     |
+ * | 30:24     | NA       | Reserved bits.                                    |
+ * | 23:16     | LSIO_SEL | If IO_SEL is 0, use this to choose LSIO func      |
+ * | 15:12     | NA       | Reserved bits.                                    |
+ * | 11:10     | IO_SEL   | Use this to choose IO func                        |
+ * |  9        | SL       | Slew rate control enable.                         |
+ * |  8        | IO_MSC   | Output enable.It can disable or enable IO output. |
+ * |  7        | IE_EN    | Input enable. It can disable or enable IO input.  |
+ * |  6        | OE_EN    | Output enable.It can disable or enable IO output. |
+ * |  5        | PU       | Pull enable.                                      |
+ * |  4        | PD       | Pull select: 0 for pull down, 1 for pull up.      |
+ * | 3:1       | DS       | Driving selector.                                 |
+ * |  0        | ST       | Schmitt trigger.                                  |
+ *
+ */
+typedef struct mux_config {
+    uint32_t st : 1;
+	/*!< Schmitt trigger. */
+	uint32_t ds : 3;
+	/*!< Driving selector. */
+	uint32_t pd : 1;
+	/*!< Pull down enable. 0 for nothing, 1 for pull down. */
+	uint32_t pu : 1;
+	/*!< Pull up enable. 0 for nothing, 1 for pull up. */
+	uint32_t oe_en : 1;
+	/*!< Static output enable. */
+	uint32_t ie_en : 1;
+	/*!< Static output enable. */
+	uint32_t msc : 1;
+	/*!< msc control bit. */
+	uint32_t sl : 1;
+	/*!< Slew rate control enable. */
+	/*!< IO config setting. */
+	uint32_t io_sel : 2;
+	/*!< set io function mode. */
+	uint32_t resv0 : 4;
+	/*!< Reserved bits. */
+	uint32_t lsio_sel : 8;
+	/*!< if io function mode is lsio, set lsio function connection. */
+	uint32_t resv1 : 7;
+	/*!< Reserved bits. */
+	uint32_t pad_di : 1;
+	/*!< Read current IO's data input. */
+} muxpin_config_t __attribute__((aligned(4)));
+
+/**
+ * @brief      FPIOA Object
+ *
+ *             FPIOA Object have 48 IO pin object and 256 bit input tie bits.
+ *             All SPI arbitration signal will tie high by default.
+ *
+ * @note       FPIOA IO Pin RAM Layout
+ *
+ * | Address   | Name     |Description                     |
+ * |-----------|----------|--------------------------------|
+{{#initial_config}}
+ * | 0x{{cfg_addr}} | {{padname}} | FPIOA GPIO multiplexer io {{io_name}}  |
+{{/initial_config}}
+ *
+ */
+typedef struct _muxpin_t {
+	muxpin_config_t io[MUXPIN_NUM_IO];
+	/*!< FPIOA GPIO multiplexer io array */
+} muxpin_t __attribute__((aligned(4)));
+
+/**
+ * @brief      FPIOA object instanse
+ */
+extern volatile muxpin_t *const muxpin;
+
+extern void k510_pinctrl_func2val(unsigned int func_num, muxpin_config_t *reg_val);
+
+#endif /* _DRIVER_MUXPIN_H */

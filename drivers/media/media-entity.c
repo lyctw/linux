@@ -72,15 +72,21 @@ static inline const char *intf_type(struct media_interface *intf)
 __must_check int __media_entity_enum_init(struct media_entity_enum *ent_enum,
 					  int idx_max)
 {
+	printk("%s:idx_max(0x%x)start\n",__func__,idx_max);
 	idx_max = ALIGN(idx_max, BITS_PER_LONG);
+	printk("%s:ent_enum->bmap1(%p),idx_max(0x%x)\n",__func__,ent_enum->bmap,idx_max);
 	ent_enum->bmap = kcalloc(idx_max / BITS_PER_LONG, sizeof(long),
 				 GFP_KERNEL);
+	printk("%s:ent_enum->bmap2(%p)\n",__func__,ent_enum->bmap);			
 	if (!ent_enum->bmap)
+	{
+		printk("%s:err ent_enum->bmap(%p)\n",__func__,ent_enum->bmap);
 		return -ENOMEM;
+	}	
 
 	bitmap_zero(ent_enum->bmap, idx_max);
 	ent_enum->idx_max = idx_max;
-
+	printk("%s:end\n",__func__);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(__media_entity_enum_init);
@@ -425,7 +431,10 @@ __must_check int __media_pipeline_start(struct media_entity *entity,
 	if (!pipe->streaming_count++) {
 		ret = media_graph_walk_init(&pipe->graph, mdev);
 		if (ret)
+		{
+			dev_err(entity->graph_obj.mdev->dev,"%s\n",__func__);
 			goto error_graph_walk_start;
+		}	
 	}
 
 	media_graph_walk_start(&pipe->graph, entity);
@@ -437,6 +446,7 @@ __must_check int __media_pipeline_start(struct media_entity *entity,
 		entity->stream_count++;
 
 		if (WARN_ON(entity->pipe && entity->pipe != pipe)) {
+			dev_err(entity->graph_obj.mdev->dev,"%s:entity->pipe 0x(%x),pipe0x(%x)\n",__func__,entity->pipe,pipe);
 			ret = -EBUSY;
 			goto error;
 		}
@@ -479,7 +489,7 @@ __must_check int __media_pipeline_start(struct media_entity *entity,
 
 			ret = entity->ops->link_validate(link);
 			if (ret < 0 && ret != -ENOIOCTLCMD) {
-				dev_dbg(entity->graph_obj.mdev->dev,
+				dev_err(entity->graph_obj.mdev->dev,
 					"link validation failed for '%s':%u -> '%s':%u, error %d\n",
 					link->source->entity->name,
 					link->source->index,
@@ -493,7 +503,7 @@ __must_check int __media_pipeline_start(struct media_entity *entity,
 
 		if (!bitmap_full(active, entity->num_pads)) {
 			ret = -ENOLINK;
-			dev_dbg(entity->graph_obj.mdev->dev,
+			dev_err(entity->graph_obj.mdev->dev,
 				"'%s':%u must be connected by an enabled link\n",
 				entity->name,
 				(unsigned)find_first_zero_bit(
@@ -808,18 +818,26 @@ EXPORT_SYMBOL_GPL(media_entity_remove_links);
 static int __media_entity_setup_link_notify(struct media_link *link, u32 flags)
 {
 	int ret;
+	struct media_device *mdev;
+	struct media_entity *source;
+	source = link->source->entity;
+	mdev = source->graph_obj.mdev;
 
 	/* Notify both entities. */
 	ret = media_entity_call(link->source->entity, link_setup,
 				link->source, link->sink, flags);
 	if (ret < 0 && ret != -ENOIOCTLCMD)
+	{
+		dev_err(mdev->dev,"%s:source ret(%d)\n",__func__,ret);
 		return ret;
+	}	
 
 	ret = media_entity_call(link->sink->entity, link_setup,
 				link->sink, link->source, flags);
 	if (ret < 0 && ret != -ENOIOCTLCMD) {
 		media_entity_call(link->source->entity, link_setup,
 				  link->source, link->sink, link->flags);
+		dev_err(mdev->dev,"%s:sink ret(%d)\n",__func__,ret);
 		return ret;
 	}
 
@@ -836,33 +854,56 @@ int __media_entity_setup_link(struct media_link *link, u32 flags)
 	struct media_entity *source, *sink;
 	int ret = -EBUSY;
 
+	source = link->source->entity;
+	sink = link->sink->entity;
+	mdev = source->graph_obj.mdev;
+
 	if (link == NULL)
+	{
+		dev_err(mdev->dev,"%s:link(0x%x)\n",__func__,link);
 		return -EINVAL;
+	}	
 
 	/* The non-modifiable link flags must not be modified. */
 	if ((link->flags & ~mask) != (flags & ~mask))
+	{
+		dev_err(mdev->dev,"%s:link->flags(0x%x),flags(0x%x)\n",__func__,link->flags,flags);
 		return -EINVAL;
-
+	}	
 	if (link->flags & MEDIA_LNK_FL_IMMUTABLE)
+	{
+		dev_err(mdev->dev,"%s:link->flags(0x%x)\n",__func__,link->flags);
 		return link->flags == flags ? 0 : -EINVAL;
+	}
+		
 
 	if (link->flags == flags)
+	{
+		dev_dbg(mdev->dev,"%s:link->flags(0x%x)\n",__func__,link->flags);
 		return 0;
+	}	
 
-	source = link->source->entity;
-	sink = link->sink->entity;
+//	source = link->source->entity;
+//	sink = link->sink->entity;
 
 	if (!(link->flags & MEDIA_LNK_FL_DYNAMIC) &&
 	    (source->stream_count || sink->stream_count))
+	{
+		dev_err(mdev->dev,"%s:link->flags(0x%x),MEDIA_LNK_FL_DYNAMIC(0x%x),source->stream_count(%d),sink->stream_count(%d)\n",
+		__func__,link->flags,MEDIA_LNK_FL_DYNAMIC,source->stream_count,sink->stream_count);
 		return -EBUSY;
+	}	
 
-	mdev = source->graph_obj.mdev;
+	//mdev = source->graph_obj.mdev;
 
 	if (mdev->ops && mdev->ops->link_notify) {
 		ret = mdev->ops->link_notify(link, flags,
 					     MEDIA_DEV_NOTIFY_PRE_LINK_CH);
 		if (ret < 0)
+		{
+			dev_err(mdev->dev,"%s:ret(%d)\n",__func__,ret);
 			return ret;
+		}	
 	}
 
 	ret = __media_entity_setup_link_notify(link, flags);
@@ -870,7 +911,7 @@ int __media_entity_setup_link(struct media_link *link, u32 flags)
 	if (mdev->ops && mdev->ops->link_notify)
 		mdev->ops->link_notify(link, flags,
 				       MEDIA_DEV_NOTIFY_POST_LINK_CH);
-
+	dev_dbg(mdev->dev,"%s:end ret(%d)\n",__func__,ret);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(__media_entity_setup_link);

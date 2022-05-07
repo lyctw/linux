@@ -78,3 +78,12 @@ SYSCALL_DEFINE3(riscv_flush_icache, uintptr_t, start, uintptr_t, end,
 	return 0;
 }
 #endif
+
+SYSCALL_DEFINE0(riscv_get_cycles)
+{
+        unsigned long cycles = sbi_get_cycles();
+
+//      printk("riscv_get_cycles: 0x%llx \n", cycles);
+
+        return cycles;
+}

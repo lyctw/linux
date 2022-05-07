@@ -1,0 +1,62 @@
+/* Copyright (c) 2022, Canaan Bright Sight Co., Ltd
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+*/
+#include "muxpin.h"
+
+/*
+ * NOTE: This file is automatic generated, do not edit directly.
+ * Please edit the generator instead.
+ */
+
+
+/**
+ * @brief      Internal used MUXPIN function initialize cell
+ *
+ *             This is NOT fpioa_io_config_t, can't assign directly
+ *
+ */
+
+/* LSIO Function list */
+static const muxpin_config_t function_config[(FUNC_MAX & MUXPIN_FUCTION_MASK) + 1] = {
+{{#fpioa}}
+	/*
+	 * Internal function signal {{func_number}}: {{func_name}}
+	 * {{func_desc}}
+	 */
+	{
+	 .st       = {{IO_ST}},
+	 .ds       = 0x{{IO_DS}},
+	 .pd       = {{IO_PD}},
+	 .pu       = {{IO_PU}},
+	 .oe_en    = {{IO_OE_EN}},
+	 .ie_en    = {{IO_IE_EN}},
+	 .msc      = {{IO_MSC}},
+	 .sl       = {{IO_SL}},
+	 .io_sel   = {{IO_IO_SEL}},
+	 .lsio_sel = {{IO_LSIO_SEL}}
+    },
+{{/fpioa}}
+};
+
+void k510_pinctrl_func2val(unsigned int func_num, muxpin_config_t *reg_val)
+{
+        *reg_val = (const muxpin_config_t) {
+                .lsio_sel = function_config[func_num].lsio_sel,
+                .io_sel = function_config[func_num].io_sel,
+                .ds     = function_config[func_num].ds,
+                .oe_en  = function_config[func_num].oe_en,
+                .pu     = function_config[func_num].pu,
+                .pd     = function_config[func_num].pd,
+                .sl     = function_config[func_num].sl,
+                .ie_en  = function_config[func_num].ie_en,
+                .st     = function_config[func_num].st,
+                .msc    = function_config[func_num].msc,
+                /* resv and pad_di do not need initialization */
+        };
+
+        return;
+}
+

@@ -1,0 +1,182 @@
+/* Copyright (c) 2022, Canaan Bright Sight Co., Ltd
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+*/
+
+/* There are two methods for clock configuration.Please used methord B for drivers.
+
+    Method A (for example:debufs):
+    1. clk = clk_get(NULL, clk_name);       ---> clk_name is defined in the clock_provider.dtsi
+    2. clk_set_rate(clk,rate); clk_disable(clk); clk_set_parent(clk,clk_parent); etc.
+    3. clk_put(clk);
+
+    Method B (for example:emac and other drivers):
+    1. clock_consumer.dtsi:
+        &emac {
+            clocks      = <&refclk>, <&refclk>, <&refclk>, <&refclk>, <&refclk>, <&refclk>;         -->clocks is defined in the clock_provider.dtsi
+            clock-names = "hclk", "pclk", "ether_clk", "tx_clk", "rx_clk", "tsu_clk";               -->clock-names only index
+        };
+    2. C code:
+        clk = clk_get(device, clk_name);     ---> device is platform_device->device, clk_name is clocks-names item(hclk, pclk etc.)
+        clk_set_rate(clk,rate); clk_disable(clk); clk_set_parent(clk,clk_parent); etc.
+        clk_put(clk);
+*/
+
+/*
+&serial0 {
+    clocks      = <&uart_0_apb_clk_gate_leaf>, <&uart_0_sclk_mux_div_gate_leaf>;
+    clock-names = "uart0_pclk","uar0_sclk";
+};
+*/
+
+&emac {
+    clocks      = <&emac_refclk>, <&emac_refclk>, <&emac_refclk>, <&emac_refclk>, <&emac_refclk>, <&emac_refclk>;
+    clock-names = "hclk", "pclk", "ether_clk", "tx_clk", "rx_clk", "tsu_clk";
+    clock-config= <0x97001104>;
+};
+
+&spi0 {
+    clocks      = <&spi_0_ahb>, <&spi_0_system>;
+    clock-names = "spi_hclk","spi_sclk";
+    clock-frequency = <250000000>;
+};
+
+&spi1 {
+    clocks      = <&spi_1_ahb>, <&spi_1_system>;
+    clock-names = "spi_hclk","spi_sclk";
+    clock-frequency = <50000000>;
+};
+
+&spi2 {
+    clocks      = <&spi_2_ahb>, <&spi_2_system>;
+    clock-names = "spi_hclk","spi_sclk";
+    clock-frequency = <50000000>;
+};
+
+&sdio0 {
+    clocks        = <&sd_0_master>;
+    max-frequency = <50000000>;
+};
+
+&sdio1 {
+    clocks        = <&sd_1_master>;
+    max-frequency = <50000000>;
+};
+
+&sdio2 {
+    clocks        = <&sd_2_master>;
+    max-frequency = <50000000>;
+};
+
+&i2c0 {
+    clocks      = <&i2c_0_system>;
+    clock-frequency = <100000>;
+};
+
+&i2c1 {
+    clocks      = <&i2c_1_system>;
+    clock-frequency = <100000>;
+};
+
+&i2c2 {
+    clocks      = <&i2c_2_system>;
+    clock-frequency = <100000>;
+};
+&i2c3 {
+    clocks      = <&i2c_3_system>;
+    clock-frequency = <100000>;
+};
+
+&i2c4 {
+    clocks      = <&i2c_4_system>;
+    clock-frequency = <100000>;
+};
+&i2s {
+    clocks      = <&audio_i_serial>;
+    clock-names = "i2sclk";
+};
+
+&pwm0 {
+    clocks      = <&pwm_apb>;
+    clock-names = "pwm";
+};
+
+&pwm1 {
+    clocks      = <&pwm_apb>;
+    clock-names = "pwm";
+};
+
+&wdt0 {
+    clocks      = <&wdt_0_tick>;
+};
+
+&wdt1 {
+    clocks      = <&wdt_1_tick>;
+};
+
+&wdt2 {
+    clocks      = <&wdt_2_tick>;
+};
+
+&sha {
+    clocks      = <&sha_ahb>;
+};
+
+&aes {
+    clocks      = <&aes_ahb>;
+};
+
+&pdma {
+    clocks      = <&peridma_apb>;
+};
+
+&sdma {
+    clocks      = <&sysdma_apb>;
+};
+
+&twod {
+    clocks      = <&twod_apb>, <&twod_axi>;
+    clock-names = "twod_apb", "twod_axi";
+};
+
+&h264 {
+    clocks = <&h264_axi>;
+};
+
+&isp {
+    clocks      = <&mipi_corner>,<&mipi_ref>,<&mipi_rxphy_ref>,<&csi0_system>,<&csi0_apb>, <&csi0_pixel>,<&csi1_system>,<&csi1_apb>, <&csi1_pixel>,<&vi_axi>,<&vi_apb>,<&tpg_pixel>,<&isp_f2k_apb>,<&isp_f2k_axi>,<&isp_r2k_apb>,<&isp_r2k_axi>,<&isp_tof_apb>,<&isp_tof_axi>,<&fbc_apb>,<&fbc_axi>;
+    clock-names = "mipi_corner","mipi_ref","mipi_rxphy_ref","csi0_system","csi0_apb", "csi0_pixel","csi1_system","csi1_apb", "csi1_pixel","vi_axi","vi_apb","tpg_pixel","isp_f2k_apb","isp_f2k_axi","isp_r2k_apb","isp_r2k_axi","isp_tof_apb","isp_tof_axi","fbc_apb","fbc_axi";
+};
+
+&isp1 {
+    clocks      = <&mipi_corner>,<&mipi_ref>,<&mipi_rxphy_ref>,<&csi0_system>,<&csi0_apb>, <&csi0_pixel>,<&csi1_system>,<&csi1_apb>, <&csi1_pixel>,<&vi_axi>,<&vi_apb>,<&tpg_pixel>,<&isp_f2k_apb>,<&isp_f2k_axi>,<&isp_r2k_apb>,<&isp_r2k_axi>,<&isp_tof_apb>,<&isp_tof_axi>,<&fbc_apb>,<&fbc_axi>;
+    clock-names = "mipi_corner","mipi_ref","mipi_rxphy_ref","csi0_system","csi0_apb", "csi0_pixel","csi1_system","csi1_apb", "csi1_pixel","vi_axi","vi_apb","tpg_pixel","isp_f2k_apb","isp_f2k_axi","isp_r2k_apb","isp_r2k_axi","isp_tof_apb","isp_tof_axi","fbc_apb","fbc_axi";
+};
+
+&mailbox {
+    clocks = <&mailbox_apb>;
+};
+
+&tsensor {
+    clocks = <&mailbox_apb>;
+};
+
+&mipi_tx_dphy {
+    clocks = <&mipi_corner>, <&mipi_ref>, <&mipi_txphy_ref>, <&mipi_txphy_pll>;
+    clock-names = "mipi_conner", "mipi_ref", "mipi_txphy_ref", "mipi_txphy_pll";
+};
+
+&mipi_dsi {
+
+    clocks = <&dsi_apb>, <&dsi_system>, <&display_pixel>;
+    clock-names = "dsi_apb", "dsi_system", "display_pixel";
+
+};
+
+&vop {
+    clocks = <&vo_apb>, <&vo_axi>;
+    clock-names = "vo_apb", "vo_axi";
+
+};

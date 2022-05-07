@@ -155,5 +155,6 @@ config DA8XX_DDRCTL
 
 source "drivers/memory/samsung/Kconfig"
 source "drivers/memory/tegra/Kconfig"
+source "drivers/memory/canaan/Kconfig"
 
 endif

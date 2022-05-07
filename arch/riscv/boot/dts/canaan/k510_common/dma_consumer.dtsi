@@ -1,0 +1,24 @@
+&sha {
+    dmas = <&pdma 1 0xfff 0 0x20>;
+    dma-names = "tx";
+};
+
+&aes {
+    dmas = <&pdma 1 0xfff 0 0x21>, <&pdma 1 0xfff 0 0x22>;
+    dma-names = "tx", "rx";
+};
+
+&i2s {
+    dmas = <&pdma 1 0xfff 0 0x1b>, <&pdma 1 0xfff 0 0x1c>;
+    dma-names = "tx", "rx";
+};
+
+&spi1 {
+    dmas = <&pdma 1 0xfff 0 0x08>, <&pdma 1 0xfff 0 0x09>;
+    dma-names = "tx", "rx";
+};
+
+&spi2 {
+    dmas = <&pdma 1 0xfff 0 0x0A>, <&pdma 1 0xfff 0 0x0B>;
+    dma-names = "tx", "rx";
+};

@@ -83,6 +83,9 @@ static int hash_sendmsg(struct socket *sock, struct msghdr *msg,
 		if ((msg->msg_flags & MSG_MORE))
 			hash_free_result(sk, ctx);
 
+        int len = msg_data_left(msg);
+		ahash_request_set_crypt(&ctx->req, NULL, NULL, len);
+
 		err = crypto_wait_req(crypto_ahash_init(&ctx->req), &ctx->wait);
 		if (err)
 			goto unlock;

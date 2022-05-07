@@ -1,0 +1,9 @@
+&pdma {
+    #dma-cells = <4>;
+    dma-channels = <16>;
+    dma-requests = <35>;
+};
+
+&sdma {
+    dma-channels = <4>;
+};

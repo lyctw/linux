@@ -242,28 +242,32 @@ static int dw_i2s_hw_params(struct snd_pcm_substream *substream,
 
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_S16_LE:
-		config->data_width = 16;
-		dev->ccr = 0x00;
+		config->data_width = 32;
+		dev->ccr = 0x10;
+		dev->ccr |= 1<<10;//dma_divide_16
 		dev->xfer_resolution = 0x02;
+		dev->capture_dma_data.dt.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;//receive not support dma_divide_16.
 		break;
 
 	case SNDRV_PCM_FORMAT_S24_LE:
-		config->data_width = 24;
-		dev->ccr = 0x08;
+		config->data_width = 32;
+		dev->ccr = 0x10;
 		dev->xfer_resolution = 0x04;
+		dev->capture_dma_data.dt.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
 		break;
 
 	case SNDRV_PCM_FORMAT_S32_LE:
 		config->data_width = 32;
 		dev->ccr = 0x10;
 		dev->xfer_resolution = 0x05;
+		dev->capture_dma_data.dt.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
 		break;
 
 	default:
 		dev_err(dev->dev, "designware-i2s: unsupported PCM fmt");
 		return -EINVAL;
 	}
-
+	dev->ccr |= (1<<5) | (3<<8);//dma_tx_en||dma_rx_en
 	config->chan_nr = params_channels(params);
 
 	switch (config->chan_nr) {
@@ -468,7 +472,7 @@ static const u32 formats[COMP_MAX_WORDSIZE] = {
 	SNDRV_PCM_FMTBIT_S16_LE,
 	SNDRV_PCM_FMTBIT_S24_LE,
 	SNDRV_PCM_FMTBIT_S24_LE,
-	SNDRV_PCM_FMTBIT_S32_LE,
+	SNDRV_PCM_FMTBIT_S32_LE|SNDRV_PCM_FMTBIT_S16_LE,
 	0,
 	0,
 	0
@@ -594,7 +598,7 @@ static int dw_configure_dai_by_dt(struct dw_i2s_dev *dev,
 		dev->play_dma_data.dt.addr_width = bus_widths[idx];
 		dev->play_dma_data.dt.fifo_size = fifo_depth *
 			(fifo_width[idx2]) >> 8;
-		dev->play_dma_data.dt.maxburst = 16;
+		dev->play_dma_data.dt.maxburst = 4;
 	}
 	if (COMP1_RX_ENABLED(comp1)) {
 		idx2 = COMP2_RX_WORDSIZE_0(comp2);
@@ -604,7 +608,7 @@ static int dw_configure_dai_by_dt(struct dw_i2s_dev *dev,
 		dev->capture_dma_data.dt.addr_width = bus_widths[idx];
 		dev->capture_dma_data.dt.fifo_size = fifo_depth *
 			(fifo_width[idx2] >> 8);
-		dev->capture_dma_data.dt.maxburst = 16;
+		dev->capture_dma_data.dt.maxburst = 4;
 	}
 
 	return 0;

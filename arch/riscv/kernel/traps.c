@@ -47,6 +47,7 @@ void die(struct pt_regs *regs, const char *str)
 	pr_emerg("%s [#%d]\n", str, ++die_counter);
 	print_modules();
 	show_regs(regs);
+        dump_stack();
 
 	ret = notify_die(DIE_OOPS, str, regs, 0, regs->scause, SIGSEGV);
 

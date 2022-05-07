@@ -25,7 +25,6 @@
 #include <asm/page.h>
 #include <asm/tlbflush.h>
 #include <linux/mm_types.h>
-#include <linux/sizes.h>
 
 #ifdef CONFIG_64BIT
 #include <asm/pgtable-64.h>
@@ -118,9 +117,17 @@ static inline int pmd_bad(pmd_t pmd)
 	return !pmd_present(pmd);
 }
 
+#define pmd_leaf        pmd_leaf
+static inline int pmd_leaf(pmd_t pmd)
+{
+        return pmd_present(pmd) &&
+               (pmd_val(pmd) & (_PAGE_READ | _PAGE_WRITE | _PAGE_EXEC));
+}
+
 static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
 {
 	*pmdp = pmd;
+	flush_tlb_all();
 }
 
 static inline void pmd_clear(pmd_t *pmdp)
@@ -144,11 +151,6 @@ static inline pgd_t *pgd_offset(const struct mm_struct *mm, unsigned long addr)
 /* Locate an entry in the kernel page global directory */
 #define pgd_offset_k(addr)      pgd_offset(&init_mm, (addr))
 
-#ifdef CONFIG_HIGHMEM
-/* Locate an entry in the second-level page table */
-#define pmd_off_k(address)  pmd_offset((pud_t *)pgd_offset_k(address), address)
-#endif
-
 static inline struct page *pmd_page(pmd_t pmd)
 {
 	return pfn_to_page(pmd_val(pmd) >> _PAGE_PFN_SHIFT);
@@ -171,13 +173,13 @@ static inline unsigned long pte_pfn(pte_t pte)
 extern phys_addr_t pa_msb;
 static inline pte_t pfn_pte(unsigned long pfn, pgprot_t prot)
 {
-	/*
-	 * When PMA is on and activated: pa_msb == 0;
-	 * 		      Otherwise: pa_msb != 0;
-	 */
-	return (pa_msb && (pgprot_val(prot) & _PAGE_NONCACHEABLE)) ? \
-		__pte(((pfn|pa_msb) << _PAGE_PFN_SHIFT) | (pgprot_val(prot) & ~_PAGE_NONCACHEABLE)) : \
-		__pte((pfn << _PAGE_PFN_SHIFT) | pgprot_val(prot));
+	pte_t ret;
+	if (pgprot_val(prot) & _PAGE_NONCACHEABLE) {
+		ret = __pte(((pfn|pa_msb) << _PAGE_PFN_SHIFT) | (pgprot_val(prot) & ~_PAGE_NONCACHEABLE));
+	} else {
+		ret = __pte((pfn << _PAGE_PFN_SHIFT) | pgprot_val(prot));
+	}
+	return ret;
 }
 
 static inline pte_t mk_pte(struct page *page, pgprot_t prot)
@@ -315,6 +317,7 @@ static inline int pte_same(pte_t pte_a, pte_t pte_b)
 static inline void set_pte(pte_t *ptep, pte_t pteval)
 {
 	*ptep = pteval;
+	flush_tlb_all();
 }
 
 void flush_icache_pte(pte_t pte);
@@ -430,19 +433,19 @@ static inline void pgtable_cache_init(void)
 	/* No page table caches to initialize */
 }
 
-#ifdef CONFIG_HIGHMEM
-#define VMALLOC_SIZE     (SZ_128M)
-#define VMALLOC_END      (0xfff00000UL) /*Reserved 1023K from FFFF_FFFFF*/
-#define VMALLOC_START    (VMALLOC_END - VMALLOC_SIZE)
-
-#include <asm/fixmap.h>
-#define LOWMEM_END			(ALIGN_DOWN(FIXADDR_START, SZ_4M))
-#define LOWMEM_SIZE			(LOWMEM_END - PAGE_OFFSET)
-#define LOWMEM_END_PFN		(PFN_DOWN(__pa(LOWMEM_END)))
-#else
 #define VMALLOC_SIZE     (KERN_VIRT_SIZE >> 1)
 #define VMALLOC_END      (PAGE_OFFSET - 1)
 #define VMALLOC_START    (PAGE_OFFSET - VMALLOC_SIZE)
+
+/*
+ * In the RV64 Linux scheme, we give the user half of the virtual-address space
+ * and give the kernel the other (upper) half.
+ */
+#define CONFIG_VA_BITS 39
+#ifdef CONFIG_64BIT
+#define KERN_VIRT_START	(-(BIT(CONFIG_VA_BITS)) + TASK_SIZE)
+#else
+#define KERN_VIRT_START	FIXADDR_START
 #endif
 
 /*
@@ -452,11 +455,7 @@ static inline void pgtable_cache_init(void)
 #ifdef CONFIG_64BIT
 #define TASK_SIZE (PGDIR_SIZE * PTRS_PER_PGD / 2)
 #else
-#ifdef CONFIG_HIGHMEM
-#define TASK_SIZE UL(CONFIG_PAGE_OFFSET)
-#else
 #define TASK_SIZE VMALLOC_START
-#endif
 #endif
 
 #include <asm-generic/pgtable.h>

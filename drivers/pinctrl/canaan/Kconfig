@@ -1,0 +1,10 @@
+config PINCTRL_K510
+        tristate "K510 pinctrl driver"
+        depends on OF
+        depends on HAS_IOMEM
+        select GENERIC_PINCTRL_GROUPS
+        select GENERIC_PINMUX_FUNCTIONS
+        select GENERIC_PINCONF
+        help
+          This selects the pinctrl driver for K510.
+

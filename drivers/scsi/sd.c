@@ -3104,9 +3104,9 @@ static int sd_revalidate_disk(struct gendisk *disk)
 
 		sd_print_capacity(sdkp, old_capacity);
 
-		sd_read_write_protect_flag(sdkp, buffer);
-		sd_read_cache_type(sdkp, buffer);
-		sd_read_app_tag_own(sdkp, buffer);
+		// sd_read_write_protect_flag(sdkp, buffer);
+		// sd_read_cache_type(sdkp, buffer);
+		// sd_read_app_tag_own(sdkp, buffer);
 		sd_read_write_same(sdkp, buffer);
 		sd_read_security(sdkp, buffer);
 	}

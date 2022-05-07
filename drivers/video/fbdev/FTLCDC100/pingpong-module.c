@@ -1,6 +1,6 @@
 #include <linux/io.h>
 
-void *fmem_alloc(size_t size, dma_addr_t *dma_handle, bool has_dma_coherent)
+void *fmem_alloc(size_t size, dma_addr_t *dma_handle)
 {
 	struct page *page;
 	void *cpu_addr = NULL;
@@ -11,13 +11,9 @@ void *fmem_alloc(size_t size, dma_addr_t *dma_handle, bool has_dma_coherent)
 	}
 	*dma_handle = page_to_phys(page);
 
-	if(!has_dma_coherent){
-		cpu_addr = ioremap_nocache(*dma_handle, size);
-	}else{
-		cpu_addr = ioremap(*dma_handle, size);
-	}
+	if ((cpu_addr = ioremap(*dma_handle, size))) {
 
-	if (cpu_addr) {
+
 		do {
 			SetPageReserved(page);
 			page++;
@@ -45,6 +41,7 @@ void fmem_free(size_t size, void *cpu_addr, dma_addr_t handle)
 	} while (size -= PAGE_SIZE);
 }
 
+extern phys_addr_t pa_msb;
 static int faradayfb_mmap(struct fb_info *info, struct vm_area_struct *vma)
 {
 	struct faradayfb_info *fbi = info->par;
@@ -54,12 +51,10 @@ static int faradayfb_mmap(struct fb_info *info, struct vm_area_struct *vma)
 	DEBUG(0, 1, "Enter\n");
 
 	if (off < info->fix.smem_len) {
-
 		off += fbi->screen_dma & PAGE_MASK;
 		vma->vm_pgoff = off >> PAGE_SHIFT;
-		if(!info->device->archdata.dma_coherent){
-			vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
-		}
+		vma->vm_pgoff |= (!info->device->archdata.dma_coherent) ? pa_msb : 0;
+		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
 		ret = remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
 				vma->vm_end - vma->vm_start, vma->vm_page_prot);
 	}
@@ -83,10 +78,12 @@ static int __init faradayfb_map_video_memory(struct fb_info *info)
 {
 	struct faradayfb_info *fbi = info->par;
 
-	bool dma_coherent = info->device->archdata.dma_coherent;
-
-	fbi->map_size = PAGE_ALIGN(info->fix.smem_len);
-	fbi->map_cpu = fmem_alloc(fbi->map_size, &fbi->map_dma, dma_coherent);
+	/*
+	 * We reserve one page for the palette, plus the size
+	 * of the framebuffer.
+	 */
+	fbi->map_size = PAGE_ALIGN(info->fix.smem_len + PAGE_SIZE);
+	fbi->map_cpu = fmem_alloc(fbi->map_size, &fbi->map_dma);
 
 	if (fbi->map_cpu) {
 
@@ -126,26 +123,13 @@ static inline void faradayfb_unmap_video_memory(struct fb_info *info)
 #define FRAME_SIZE_YUV422(xres, yres, mbpp)	(((xres) * (yres) * (mbpp) / 8) * 2)
 #define FRAME_SIZE_YUV420(xres, yres, mbpp)	(((((xres) * (yres) * (mbpp) / 8) + 0xffff) & 0xffff0000) * 3 / 2)
 
-unsigned int nextPowerOf2(unsigned int n)
-{
-    n--;
-    n |= n >> 1;
-    n |= n >> 2;
-    n |= n >> 4;
-    n |= n >> 8;
-    n |= n >> 16;
-    n++;
-    return n;
-}
-
 static inline u32 faradayfb_cal_frame_buf_size(struct faradayfb_info *fbi)
 {
 	u32 size_rgb	= FRAME_SIZE_RGB(fbi->xres, fbi->yres, fbi->max_bpp);
 	u32 size_yuv422	= FRAME_SIZE_YUV422(fbi->xres, fbi->yres, 8);
 	u32 size_yuv420	= FRAME_SIZE_YUV420(fbi->xres, fbi->yres, 8);
 
-	// PMA needs to allocate power of 2 memory size
-	return nextPowerOf2(max(size_rgb, max(size_yuv422, size_yuv420)));
+	return max(size_rgb, max(size_yuv422, size_yuv420));
 }
 
 #ifdef CONFIG_FTLCD_OSD

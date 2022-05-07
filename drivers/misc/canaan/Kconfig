@@ -1,0 +1,8 @@
+menu "Canaan k510 drivers"
+
+source "drivers/misc/canaan/i2c/Kconfig"
+source "drivers/misc/canaan/gnne/Kconfig"
+source "drivers/misc/canaan/k510-dsp/Kconfig"
+source "drivers/misc/canaan/k510-share-memory/Kconfig"
+
+endmenu

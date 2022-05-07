@@ -1,0 +1,3 @@
+All source file included in core_drv_mod directory are under the terms of:
+Copyright (C) 2014 Cadence Design Systems, Inc.
+

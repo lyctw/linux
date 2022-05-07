@@ -22,7 +22,6 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/memblock.h>
-#include <linux/bootmem.h>
 #include <linux/sched.h>
 #include <linux/initrd.h>
 #include <linux/console.h>
@@ -40,7 +39,36 @@
 #include <asm/tlbflush.h>
 #include <asm/thread_info.h>
 #include <asm/csr.h>
-#include <asm/kasan.h>
+#include <asm/io.h>
+
+#define RESTART 1
+#ifdef RESTART
+
+extern int register_restart_handler(struct notifier_block *nb);
+
+#define SYSCTL_BOOT_BASE_ADDR   0x97000000U
+#define SOC_GLB_RST             0x60
+
+static void __iomem *MMAP_ADDR;
+
+static int k510_restart(struct notifier_block *this, unsigned long mode, void *cmd)
+{
+    MMAP_ADDR = ioremap(SYSCTL_BOOT_BASE_ADDR + SOC_GLB_RST, 4);
+
+    writel(((1 << 0) | (1 << 16)), MMAP_ADDR);
+    while(1);
+}
+
+static int k510_restart_register(void)
+{
+    static struct notifier_block restart_handler;
+
+    restart_handler.notifier_call = k510_restart;
+    restart_handler.priority = 128;
+
+    return register_restart_handler(&restart_handler);
+}
+#endif
 
 #ifdef CONFIG_EARLY_PRINTK
 static void sbi_console_write(struct console *co, const char *buf,
@@ -132,12 +160,6 @@ pmd_t trampoline_pmd[PTRS_PER_PGD] __initdata __aligned(PAGE_SIZE);
 phys_addr_t pa_msb;
 asmlinkage void __init setup_maxpa(void)
 {
-#ifdef CONFIG_PMA
-	if (sbi_probe_pma()) {
-		pa_msb = 0;
-		return;
-	}
-#endif
 	csr_write(satp, SATP_PPN);
 	pa_msb = (csr_read(satp) + 1) >>1;
 }
@@ -154,9 +176,6 @@ asmlinkage void __init setup_vm(void)
 	/* Sanity check alignment and size */
 	BUG_ON((PAGE_OFFSET % PGDIR_SIZE) != 0);
 	BUG_ON((pa % (PAGE_SIZE * PTRS_PER_PTE)) != 0);
-#ifdef CONFIG_HIGHMEM
-	BUG_ON((LOWMEM_SIZE % PGDIR_SIZE) != 0);
-#endif
 
 #ifndef __PAGETABLE_PMD_FOLDED
 	trampoline_pg_dir[(PAGE_OFFSET >> PGDIR_SHIFT) % PTRS_PER_PGD] =
@@ -164,13 +183,8 @@ asmlinkage void __init setup_vm(void)
 			__pgprot(_PAGE_TABLE));
 	trampoline_pmd[0] = pfn_pmd(PFN_DOWN(pa), prot);
 
-#ifndef CONFIG_HIGHMEM
 	for (i = 0; i < (-PAGE_OFFSET)/PGDIR_SIZE; ++i) {
-#else
-	for (i = 0; i < (LOWMEM_SIZE)/PGDIR_SIZE; ++i) {
-#endif
 		size_t o = (PAGE_OFFSET >> PGDIR_SHIFT) % PTRS_PER_PGD + i;
-
 		swapper_pg_dir[o] =
 			pfn_pgd(PFN_DOWN((uintptr_t)swapper_pmd) + i,
 				__pgprot(_PAGE_TABLE));
@@ -180,11 +194,8 @@ asmlinkage void __init setup_vm(void)
 #else
 	trampoline_pg_dir[(PAGE_OFFSET >> PGDIR_SHIFT) % PTRS_PER_PGD] =
 		pfn_pgd(PFN_DOWN(pa), prot);
-#ifndef CONFIG_HIGHMEM
+
 	for (i = 0; i < (-PAGE_OFFSET)/PGDIR_SIZE; ++i) {
-#else
-	for (i = 0; i < (LOWMEM_SIZE)/PGDIR_SIZE; ++i) {
-#endif
 		size_t o = (PAGE_OFFSET >> PGDIR_SHIFT) % PTRS_PER_PGD + i;
 		swapper_pg_dir[o] =
 			pfn_pgd(PFN_DOWN(pa + i * PGDIR_SIZE), prot);
@@ -213,23 +224,14 @@ static void __init setup_bootmem(void)
 			 * the kernel
 			 */
 			memblock_reserve(reg->base, vmlinux_end - reg->base);
-#ifdef CONFIG_HIGHMEM
-			mem_size = reg->size;
-#else
 			mem_size = min(reg->size, (phys_addr_t)-PAGE_OFFSET);
-#endif
 		}
 	}
 	BUG_ON(mem_size == 0);
 
 	set_max_mapnr(PFN_DOWN(mem_size));
-#ifdef CONFIG_HIGHMEM
-	max_low_pfn = LOWMEM_END_PFN ;
-	 max_pfn	= PFN_DOWN(memblock_end_of_DRAM());
-	 memblock_set_current_limit(__pa(LOWMEM_END));
-#else
 	max_low_pfn = PFN_DOWN(memblock_end_of_DRAM());
-#endif
+
 #ifdef CONFIG_BLK_DEV_INITRD
 	setup_initrd();
 #endif /* CONFIG_BLK_DEV_INITRD */
@@ -272,11 +274,6 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_SWIOTLB
 	swiotlb_init(1);
 #endif
-
-#ifdef CONFIG_KASAN
-	kasan_init();
-#endif
-
 #ifdef CONFIG_SMP
 	setup_smp();
 #endif
@@ -286,6 +283,8 @@ void __init setup_arch(char **cmdline_p)
 #endif
 
 	riscv_fill_hwcap();
+
+    k510_restart_register();
 }
 
 static int __init topology_init(void)

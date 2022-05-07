@@ -1,0 +1,65 @@
+//RGB
+&i2c1 {
+	status = "okay";
+	imx385: imx385@1a {
+		compatible = "sony,imx385";
+		reg = <0x1a>;
+		//
+		reset-gpios = <&porta 49 GPIO_ACTIVE_HIGH>;
+		//powerdown-gpios = <&porta 1 GPIO_ACTIVE_HIGH>;
+
+		canaanchip,camera-module-index = <0>;
+        canaanchip,camera-module-facing = "front";
+		canaanchip,camera-module-name = "BFC105-DUAL-L";
+		canaanchip,camera-module-lens-name = "RGB";
+		//ir-cut = <&cam_ircut0>;
+		hflip = <1>;
+		
+		port {
+			ucam_out0: endpoint {
+				remote-endpoint = <&mipi_in_ucam0>;
+				data-lanes = <1 2>;
+			};
+		};
+	}; 
+};
+
+&isp1{
+	status = "okay";
+	sensor_num =<1>;
+	dphy_speed =<1>; //0-RXDPHY_SPEED_MODE_2500M,1-RXDPHY_SPEED_MODE_1500M
+	dphy_mode = <0>;//0-TWO_LANES_MODE,1-FOUR_LANES_MODE
+	sony_mode = <0>;//0-SONY_POL_MODE_DIS,1-SONY_POL_MODE_EN
+	ports {
+		//port@0 {
+		//	dvp_in_ucam2: endpoint@2 {
+		//		//status = "okay";
+		//		//remote-endpoint = <&ucam_out1>;
+		//		//data-lanes = <3 4>;
+		//		data-type = <0x2b>; //0x1E-MIPI_YUV422,0x2A-MIPI_RAW8,0x2B-MIPI_RAW10,0x2C-MIPI_RAW12
+		//		tpg_r_en = <0>;
+		//		tpg_w_en = <0>;
+		//		wdr_sensor_vendor =<0>;//0-"SONY_WDR_SENSOR", 1=OTHERS_WDR_SENSOR
+		//		wdr_mode = <0>;//0-none wdr mode, 1-2frame wdr mode, 2-3frame wdr mode
+		//		mipi_csi_mode = <0>; //0- normal mode, 1 -debug mode
+		//		isp_pipeline = <3>;//1 -ISP_F_2K, 2 -ISP_R_2K,3-ISP_TOF
+		//	};
+		//};
+		port@1 {
+			reg = <1>;
+			mipi_in_ucam0: endpoint@0 {
+				status = "okay";
+				remote-endpoint = <&ucam_out0>;
+				clock-lanes = <0>;
+				data-lanes = <1 2>;
+				data-type = <0x2c>; //0x1E-MIPI_YUV422,0x2A-MIPI_RAW8,0x2B-MIPI_RAW10,0x2C-MIPI_RAW12
+				tpg_r_en = <0>;
+				tpg_w_en = <0>;
+				wdr_sensor_vendor =<0>;//0-"SONY_WDR_SENSOR", 1=OTHERS_WDR_SENSOR
+				wdr_mode = <0>;//0-none wdr mode ,1-2frame wdr mode, 2-3frame wdr mode
+				mipi_csi_mode = <0>; //0- normal mode ,1 -debug mode
+				isp_pipeline = <1>;//1 -ISP_F_2K, 2 -ISP_R_2K, 3-ISP_TOF
+			};
+		};
+	};
+};

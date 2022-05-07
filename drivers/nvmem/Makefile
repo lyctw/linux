@@ -37,3 +37,5 @@ obj-$(CONFIG_MESON_MX_EFUSE)	+= nvmem_meson_mx_efuse.o
 nvmem_meson_mx_efuse-y		:= meson-mx-efuse.o
 obj-$(CONFIG_NVMEM_SNVS_LPGPR)	+= nvmem_snvs_lpgpr.o
 nvmem_snvs_lpgpr-y		:= snvs_lpgpr.o
+obj-$(CONFIG_NVMEM_KENDRYTE_OTP) 	+= nvmem_kendryte_otp.o
+nvmem_kendryte_otp-y	:= kendryte_otp.o

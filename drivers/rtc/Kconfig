@@ -1848,4 +1848,11 @@ config RTC_DRV_GOLDFISH
 	  Goldfish is a code name for the virtual platform developed by Google
 	  for Android emulation.
 
+config RTC_DRV_KENDRYTE
+    tristate "Kendryte Real Time Clock"
+    help
+        If you say yes here, you get support for the Kendryte K510 SOC
+        Real Time Clock.
+
+
 endif # RTC_CLASS

@@ -222,6 +222,12 @@ config IMX_THERMAL
 	  cpufreq is used as the cooling device to throttle CPUs when the
 	  passive trip is crossed.
 
+config CANAAN_THERMAL
+	tristate "Temperature sensor driver for canaan k510 SoCs"
+	help
+		Support Temperature Sensor (tsensor) module on canaan k510 SoCs.
+		The function of the cooling device has not ye been realized.
+
 config MAX77620_THERMAL
 	tristate "Temperature sensor driver for Maxim MAX77620 PMIC"
 	depends on MFD_MAX77620

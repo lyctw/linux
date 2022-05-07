@@ -750,4 +750,14 @@ config CRYPTO_DEV_CCREE
 	  cryptographic operations on the system REE.
 	  If unsure say Y.
 
+config CRYPTO_DEV_KENDRYTE
+	bool "Support for KENDRYTE cryptographic accelerator"
+	help
+		Support for KENDRYTE cryptographic accelerator.
+if CRYPTO_DEV_KENDRYTE
+	source "drivers/crypto/kendryte/Kconfig"
+endif
+
+
+
 endif # CRYPTO_HW

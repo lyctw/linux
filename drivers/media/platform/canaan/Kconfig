@@ -1,0 +1,23 @@
+    config K510_ISP_TEST_DRIVER
+        tristate "k510 isp test driver"
+        depends on HAS_DMA
+        depends on HAS_IOMEM
+        help
+          Say Y for enabling the k510 isp test driver
+
+          To compile this support as a module, choose M here:
+          The module will be called allegro_encoder.
+          If unsure, say N.
+
+    config K510_2D_DRIVER
+        tristate "k510 2d test driver"
+        depends on HAS_DMA
+        depends on HAS_IOMEM
+        help
+          Say Y for enabling the k510 2d test driver
+
+          To compile this support as a module, choose M here:
+          The module will be called allegro_encoder.
+          If unsure, say N.
+
+source "drivers/media/platform/canaan/al5r/Kconfig"

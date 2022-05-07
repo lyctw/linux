@@ -132,6 +132,21 @@ config MAILBOX_TEST
 	  Test client to help with testing new Controller driver
 	  implementations.
 
+config CANAAN_MBOX
+	tristate "Canaan Mailbox driver"
+	help
+		An implementation fo the Canaan K510 Soc. It is used to send 
+		message between CPU and DSP. Say Y here if you want to have 
+		this support. If unsure say N.
+
+config CANAAN_MBOX_CLIENT
+	tristate "Canaan Mailbox Client"
+	depends on OF
+	depends on HAS_IOMEM
+	depends on CANAAN_MBOX
+	help
+		canaan mailbox client driver.
+
 config QCOM_APCS_IPC
 	tristate "Qualcomm APCS IPC driver"
 	depends on ARCH_QCOM || COMPILE_TEST

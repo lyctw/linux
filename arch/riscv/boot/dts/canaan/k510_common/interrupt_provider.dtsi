@@ -1,0 +1,65 @@
+/* Copyright (c) 2022, Canaan Bright Sight Co., Ltd
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+*/
+
+/* CPU interrupt controller */
+&cpu0 {
+    cpu0_intc: interrupt-controller {
+        status              = "okay";
+        compatible          = "riscv,cpu-intc";
+        #interrupt-cells    = <1>;
+        interrupt-controller;
+        
+    };
+};
+
+&cpu1 {
+    cpu1_intc: interrupt-controller {
+        status              = "okay";
+        compatible          = "riscv,cpu-intc";
+        #interrupt-cells    = <1>;
+        interrupt-controller;
+    };
+};
+
+&soc {
+    /* external interrupt controller */
+    plic0: interrupt-controller@9EC00000 {
+        status              = "okay";
+        compatible          = "riscv,plic0";
+        #address-cells      = <2>;
+        #interrupt-cells    = <2>;
+        interrupt-controller;
+        reg                 = <0x0 0x9EC00000 0x0 0x4000000>;
+        riscv,ndev          =<140>;
+        interrupts-extended = <&cpu0_intc 11 &cpu0_intc 9
+                               &cpu1_intc 11 &cpu1_intc 9>;
+    };
+
+    /* software interrupt controller */
+    plic1: interrupt-controller@9E400000 {
+        status              = "okay";
+        compatible          = "riscv,plic1";
+        #address-cells      = <2>;
+        #interrupt-cells    = <2>;
+        interrupt-controller;
+        reg                 = <0x0 0x9E400000 0x0 0x400000>;
+        riscv,ndev          =<2>;
+        interrupts-extended = <&cpu0_intc 3 &cpu1_intc 3>;
+    };
+
+    /* machine timer interrupt controller */
+    plmt0@9E000000 {
+        status              = "okay";
+        compatible          = "riscv,plmt0";
+        interrupts-extended = <&cpu0_intc 7 &cpu1_intc 7>;
+        reg                 = <0x0 0x9E000000 0x0 0x100000>;
+    };
+};
+
+/* note: external interrupts have connected to plic0
+ * please edit interrupt_consumer.dtsi for external interrupt register 
+ */

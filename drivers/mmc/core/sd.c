@@ -719,7 +719,7 @@ int mmc_sd_get_cid(struct mmc_host *host, u32 ocr, u32 *cid, u32 *rocr)
 {
 	int err;
 	u32 max_current;
-	int retries = 10;
+	int retries = 0;
 	u32 pocr = ocr;
 
 try_again:

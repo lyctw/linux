@@ -1,0 +1,304 @@
+/* Copyright (c) 2022, Canaan Bright Sight Co., Ltd
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+*/
+ 
+ /* consumer api guide 
+  1. xxx_probe function call struct reset_control *devm_reset_control_get(struct device *dev, const char *id);
+     Note: If probe error or xxx_detach, devm will auto call reset_control_put
+  2. devm_reset_control_get will call devm_reset_control_get_exclusive. 
+     That is, an assert causes the reset line to be asserted immediately, and a deassert causes the reset line to be deasserted immediately. 
+     
+  for example:
+  sram0_probe:  rst = devm_reset_control_get(dev,"sram0_rst"); or rst = devm_reset_control_get(dev,NULL); only one reset-names
+  isp_probe:    rst = devm_reset_control_get(dev, "vi_rst"); isp has more than one reset-names
+*/
+
+#include <dt-bindings/reset/canaan-k510-reset.h>
+
+/* Please call device_reset(&platform_device->device) api to reset device */
+
+&sram0 {
+    resets = <&sysctl_reset K510_RESET_SRAM0_REG_OFFSET K510_RESET_SRAM0_TYPE K510_RESET_SRAM0_DONE_BIT K510_RESET_SRAM0_ASSERT_BIT>;
+    reset-names = "sram0_rst";
+};
+
+&sram1 {
+    resets = <&sysctl_reset K510_RESET_SRAM1_REG_OFFSET K510_RESET_SRAM1_TYPE K510_RESET_SRAM1_DONE_BIT K510_RESET_SRAM1_ASSERT_BIT>;
+    reset-names = "sram0_rst";
+};
+
+&gnne {
+    resets = <&sysctl_reset K510_RESET_GNNE_REG_OFFSET K510_RESET_GNNE_TYPE K510_RESET_GNNE_DONE_BIT K510_RESET_GNNE_ASSERT_BIT>;
+    reset-names = "gnne_rst";
+};
+
+&dsp {
+    resets = <&sysctl_reset K510_RESET_DSP_REG_OFFSET K510_RESET_DSP_TYPE K510_RESET_DSP_DONE_BIT K510_RESET_DSP_ASSERT_BIT>;
+    reset-names = "dsp_rst";
+};
+
+&mctl {
+    resets = <&sysctl_reset K510_RESET_MCTRL_REG_OFFSET K510_RESET_MCTRL_TYPE K510_RESET_MCTRL_DONE_BIT K510_RESET_MCTRL_ASSERT_BIT>;
+    reset-names = "mctl_rst";
+};
+
+&aes {
+    resets = <&sysctl_reset K510_RESET_AES_REG_OFFSET K510_RESET_AES_TYPE K510_RESET_AES_DONE_BIT K510_RESET_AES_ASSERT_BIT>;
+    reset-names = "aes_rst";
+};
+
+&sha {
+    resets = <&sysctl_reset K510_RESET_SHA_REG_OFFSET K510_RESET_SHA_TYPE K510_RESET_SHA_DONE_BIT K510_RESET_SHA_ASSERT_BIT>;
+    reset-names = "sha_rst";
+};
+
+&otp {
+    resets = <&sysctl_reset K510_RESET_OTP_REG_OFFSET K510_RESET_OTP_TYPE K510_RESET_OTP_DONE_BIT K510_RESET_OTP_ASSERT_BIT>;
+    reset-names = "otp_rst";
+};
+
+&rom {
+    resets = <&sysctl_reset K510_RESET_ROM_REG_OFFSET K510_RESET_ROM_TYPE K510_RESET_ROM_DONE_BIT K510_RESET_ROM_ASSERT_BIT>;
+    reset-names = "rom_rst";
+};
+
+
+
+&sdios {
+    resets = <&sysctl_reset K510_RESET_SDIOS_REG_OFFSET K510_RESET_SDIOS_TYPE K510_RESET_SDIOS_DONE_BIT K510_RESET_SDIOS_ASSERT_BIT>;
+    reset-names = "sdios_rst";
+};
+
+&usb {
+    resets = <&sysctl_reset K510_RESET_USB_REG_OFFSET K510_RESET_USB_TYPE K510_RESET_USB_DONE_BIT K510_RESET_USB_ASSERT_BIT>;
+    reset-names = "usb_rst";
+};
+
+&spi0 {
+    resets = <&sysctl_reset K510_RESET_SPI0_REG_OFFSET K510_RESET_SPI0_TYPE K510_RESET_SPI0_DONE_BIT K510_RESET_SPI0_ASSERT_BIT>;
+    reset-names = "spi0_rst";
+};
+
+&spi1 {
+    resets = <&sysctl_reset K510_RESET_SPI1_REG_OFFSET K510_RESET_SPI1_TYPE K510_RESET_SPI1_DONE_BIT K510_RESET_SPI1_ASSERT_BIT>;
+    reset-names = "spi1_rst";
+};
+
+&spi2 {
+    resets = <&sysctl_reset K510_RESET_SPI2_REG_OFFSET K510_RESET_SPI2_TYPE K510_RESET_SPI2_DONE_BIT K510_RESET_SPI2_ASSERT_BIT>;
+    reset-names = "spi2_rst";
+};
+
+&spis {
+    resets = <&sysctl_reset K510_RESET_SPI3_REG_OFFSET K510_RESET_SPI3_TYPE K510_RESET_SPI3_DONE_BIT K510_RESET_SPI3_ASSERT_BIT>;
+    reset-names = "spis_rst";
+};
+
+&sdio0 {
+    resets = <&sysctl_reset K510_RESET_SDIO0_REG_OFFSET K510_RESET_SDIO0_TYPE K510_RESET_SDIO0_DONE_BIT K510_RESET_SDIO0_ASSERT_BIT>;
+    reset-names = "sdio0_rst";
+};
+
+&sdio1 {
+    resets = <&sysctl_reset K510_RESET_SDIO1_REG_OFFSET K510_RESET_SDIO1_TYPE K510_RESET_SDIO1_DONE_BIT K510_RESET_SDIO1_ASSERT_BIT>;
+    reset-names = "sdio1_rst";
+};
+
+&sdio2 {
+    resets = <&sysctl_reset K510_RESET_SDIO2_REG_OFFSET K510_RESET_SDIO2_TYPE K510_RESET_SDIO2_DONE_BIT K510_RESET_SDIO2_ASSERT_BIT>;
+    reset-names = "sdio2_rst";
+};
+
+&emac {
+    resets = <&sysctl_reset K510_RESET_EMAC_REG_OFFSET K510_RESET_EMAC_TYPE K510_RESET_EMAC_DONE_BIT K510_RESET_EMAC_ASSERT_BIT>;
+    reset-names = "emac_rst";
+};
+
+&pdma {
+    resets = <&sysctl_reset K510_RESET_PDMA_REG_OFFSET K510_RESET_PDMA_TYPE K510_RESET_PDMA_DONE_BIT K510_RESET_PDMA_ASSERT_BIT>;
+    reset-names = "pdma_rst";
+};
+
+&sdma {
+    resets = <&sysctl_reset K510_RESET_SDMA_REG_OFFSET K510_RESET_SDMA_TYPE K510_RESET_SDMA_DONE_BIT K510_RESET_SDMA_ASSERT_BIT>;
+    reset-names = "sdma_rst";
+};
+
+&serial0 {
+    resets = <&sysctl_reset K510_RESET_UART0_REG_OFFSET K510_RESET_UART0_TYPE K510_RESET_UART0_DONE_BIT K510_RESET_UART0_ASSERT_BIT>;
+    reset-names = "uart0_rst";
+};
+
+&serial1 {
+    resets = <&sysctl_reset K510_RESET_UART1_REG_OFFSET K510_RESET_UART1_TYPE K510_RESET_UART1_DONE_BIT K510_RESET_UART1_ASSERT_BIT>;
+    reset-names = "uart1_rst";
+};
+
+&serial2 {
+    resets = <&sysctl_reset K510_RESET_UART2_REG_OFFSET K510_RESET_UART2_TYPE K510_RESET_UART2_DONE_BIT K510_RESET_UART2_ASSERT_BIT>;
+    reset-names = "uart2_rst";
+};
+
+&serial3 {
+    resets = <&sysctl_reset K510_RESET_UART3_REG_OFFSET K510_RESET_UART3_TYPE K510_RESET_UART3_DONE_BIT K510_RESET_UART3_ASSERT_BIT>;
+    reset-names = "uart3_rst";
+};
+
+&i2ss {
+    resets = <&sysctl_reset K510_RESET_I2SS_REG_OFFSET K510_RESET_I2SS_TYPE K510_RESET_I2SS_DONE_BIT K510_RESET_I2SS_ASSERT_BIT>;
+    reset-names = "i2ss_rst";
+};
+
+&i2s {
+    resets = <&sysctl_reset K510_RESET_AUDIO_REG_OFFSET K510_RESET_AUDIO_TYPE K510_RESET_AUDIO_DONE_BIT K510_RESET_AUDIO_ASSERT_BIT>;
+    reset-names = "i2s_rst";
+};
+
+&audio {
+    resets = <&sysctl_reset K510_RESET_AUDIO_REG_OFFSET K510_RESET_AUDIO_TYPE K510_RESET_AUDIO_DONE_BIT K510_RESET_AUDIO_ASSERT_BIT>;
+    reset-names = "audio_rst";
+};
+
+&wdt0 {
+    resets = <&sysctl_reset K510_RESET_WDT0_REG_OFFSET K510_RESET_WDT0_TYPE K510_RESET_WDT0_DONE_BIT K510_RESET_WDT0_ASSERT_BIT>;
+    reset-names = "wdt0_rst";
+};
+
+
+&wdt1 {
+    resets = <&sysctl_reset K510_RESET_WDT1_REG_OFFSET K510_RESET_WDT1_TYPE K510_RESET_WDT1_DONE_BIT K510_RESET_WDT1_ASSERT_BIT>;
+    reset-names = "wdt1_rst";
+};
+
+&wdt2 {
+    resets = <&sysctl_reset K510_RESET_WDT2_REG_OFFSET K510_RESET_WDT2_TYPE K510_RESET_WDT2_DONE_BIT K510_RESET_WDT2_ASSERT_BIT>;
+    reset-names = "wdt2_rst";
+};
+
+&iomux {
+    resets = <&sysctl_reset K510_RESET_IOMUX_REG_OFFSET K510_RESET_IOMUX_TYPE K510_RESET_IOMUX_DONE_BIT K510_RESET_IOMUX_ASSERT_BIT>;
+    reset-names = "iomux_rst";
+};
+/*
+&gpio {
+    resets = <&sysctl_reset K510_RESET_GPIO_REG_OFFSET K510_RESET_GPIO_TYPE K510_RESET_GPIO_DONE_BIT K510_RESET_GPIO_ASSERT_BIT>;
+    reset-names = "gpio_rst";
+};
+*/
+&i2c0 {
+    resets = <&sysctl_reset K510_RESET_I2C0_REG_OFFSET K510_RESET_I2C0_TYPE K510_RESET_I2C0_DONE_BIT K510_RESET_I2C0_ASSERT_BIT>;
+    reset-names = "i2c0_rst";
+};
+
+&i2c1 {
+    resets = <&sysctl_reset K510_RESET_I2C1_REG_OFFSET K510_RESET_I2C1_TYPE K510_RESET_I2C1_DONE_BIT K510_RESET_I2C1_ASSERT_BIT>;
+    reset-names = "i2c1_rst";
+};
+
+&i2c2 {
+    resets = <&sysctl_reset K510_RESET_I2C2_REG_OFFSET K510_RESET_I2C2_TYPE K510_RESET_I2C2_DONE_BIT K510_RESET_I2C2_ASSERT_BIT>;
+    reset-names = "i2c2_rst";
+};
+
+&i2c3 {
+    resets = <&sysctl_reset K510_RESET_I2C3_REG_OFFSET K510_RESET_I2C3_TYPE K510_RESET_I2C3_DONE_BIT K510_RESET_I2C3_ASSERT_BIT>;
+    reset-names = "i2c3_rst";
+};
+
+&i2c4 {
+    resets = <&sysctl_reset K510_RESET_I2C4_REG_OFFSET K510_RESET_I2C4_TYPE K510_RESET_I2C4_DONE_BIT K510_RESET_I2C4_ASSERT_BIT>;
+    reset-names = "i2c4_rst";
+};
+
+&i2c5 {
+    resets = <&sysctl_reset K510_RESET_I2C5_REG_OFFSET K510_RESET_I2C5_TYPE K510_RESET_I2C5_DONE_BIT K510_RESET_I2C5_ASSERT_BIT>;
+    reset-names = "i2c5_rst";
+};
+
+&i2c6 {
+    resets = <&sysctl_reset K510_RESET_I2C6_REG_OFFSET K510_RESET_I2C6_TYPE K510_RESET_I2C6_DONE_BIT K510_RESET_I2C6_ASSERT_BIT>;
+    reset-names = "i2c6_rst";
+};
+
+&rtc {
+    resets = <&sysctl_reset K510_RESET_RTC_REG_OFFSET K510_RESET_RTC_TYPE K510_RESET_RTC_DONE_BIT K510_RESET_RTC_ASSERT_BIT>;
+    reset-names = "rtc_rst";
+};
+
+&mailbox {
+    resets = <&sysctl_reset K510_RESET_MAILBOX_REG_OFFSET K510_RESET_MAILBOX_TYPE K510_RESET_MAILBOX_DONE_BIT K510_RESET_MAILBOX_ASSERT_BIT>;
+    reset-names = "mailbox_rst";
+};
+
+&pwm0 {
+    resets = <&sysctl_reset K510_RESET_PWM_REG_OFFSET K510_RESET_PWM_TYPE K510_RESET_PWM_DONE_BIT K510_RESET_PWM_ASSERT_BIT>;
+    reset-names = "pwm_rst";
+};
+
+&pwm1 {
+    resets = <&sysctl_reset K510_RESET_PWM_REG_OFFSET K510_RESET_PWM_TYPE K510_RESET_PWM_DONE_BIT K510_RESET_PWM_ASSERT_BIT>;
+    reset-names = "pwm_rst";
+};
+
+&vad {
+    resets = <&sysctl_reset K510_RESET_VAD_REG_OFFSET K510_RESET_VAD_TYPE K510_RESET_VAD_DONE_BIT K510_RESET_VAD_ASSERT_BIT>;
+    reset-names = "vad_rst";
+};
+
+&timer {
+    resets = <&sysctl_reset K510_RESET_TIMER_REG_OFFSET K510_RESET_TIMER_TYPE K510_RESET_TIMER_DONE_BIT K510_RESET_TIMER_ASSERT_BIT>;
+    reset-names = "vad_rst";
+};
+
+
+&isp {
+    resets = <&sysctl_reset K510_RESET_VI_REG_OFFSET K510_RESET_VI_TYPE K510_RESET_VI_DONE_BIT K510_RESET_VI_ASSERT_BIT>,
+             <&sysctl_reset K510_RESET_ISP_F4K_REG_OFFSET K510_RESET_ISP_F4K_TYPE K510_RESET_ISP_F4K_DONE_BIT K510_RESET_ISP_F4K_ASSERT_BIT>,
+             <&sysctl_reset K510_RESET_ISP_F2K_REG_OFFSET K510_RESET_ISP_F2K_TYPE K510_RESET_ISP_F2K_DONE_BIT K510_RESET_ISP_F2K_ASSERT_BIT>,
+             <&sysctl_reset K510_RESET_ISP_R2K_REG_OFFSET K510_RESET_ISP_R2K_TYPE K510_RESET_ISP_R2K_DONE_BIT K510_RESET_ISP_R2K_ASSERT_BIT>,
+             <&sysctl_reset K510_RESET_ISP_TOF_REG_OFFSET K510_RESET_ISP_TOF_TYPE K510_RESET_ISP_TOF_DONE_BIT K510_RESET_ISP_TOF_ASSERT_BIT>,
+             <&sysctl_reset K510_RESET_CSI0_REG_OFFSET K510_RESET_CSI0_TYPE K510_RESET_CSI0_DONE_BIT K510_RESET_CSI0_ASSERT_BIT>,
+             <&sysctl_reset K510_RESET_CSI1_REG_OFFSET K510_RESET_CSI1_TYPE K510_RESET_CSI1_DONE_BIT K510_RESET_CSI1_ASSERT_BIT>,
+             <&sysctl_reset K510_RESET_CSI2_REG_OFFSET K510_RESET_CSI2_TYPE K510_RESET_CSI2_DONE_BIT K510_RESET_CSI2_ASSERT_BIT>,
+             <&sysctl_reset K510_RESET_CSI3_REG_OFFSET K510_RESET_CSI3_TYPE K510_RESET_CSI3_DONE_BIT K510_RESET_CSI3_ASSERT_BIT>,
+             <&sysctl_reset K510_RESET_SENSOR_REG_OFFSET K510_RESET_SENSOR_TYPE K510_RESET_SENSOR_DONE_BIT K510_RESET_SENSOR_ASSERT_BIT>,
+             <&sysctl_reset K510_RESET_MFBC_REG_OFFSET K510_RESET_MFBC_TYPE K510_RESET_MFBC_DONE_BIT K510_RESET_MFBC_ASSERT_BIT>,
+             <&sysctl_reset K510_RESET_MIPI_CORNER_REG_OFFSET K510_RESET_MIPI_CORNER_TYPE K510_RESET_MIPI_CORNER_DONE_BIT K510_RESET_MIPI_CORNER_ASSERT_BIT>;
+    reset-names = "vi_rst","isp_f4k_rst","isp_f2k_rst","isp_r2k_rst","isp_tof_rst","csi0_rst","csi1_rst","csi2_rst","csi3_rst","sensor_rst","mfbc_rst","mipi_corner_rst";
+};
+
+&isp1 {
+    resets = <&sysctl_reset K510_RESET_VI_REG_OFFSET K510_RESET_VI_TYPE K510_RESET_VI_DONE_BIT K510_RESET_VI_ASSERT_BIT>,
+             <&sysctl_reset K510_RESET_ISP_F4K_REG_OFFSET K510_RESET_ISP_F4K_TYPE K510_RESET_ISP_F4K_DONE_BIT K510_RESET_ISP_F4K_ASSERT_BIT>,
+             <&sysctl_reset K510_RESET_ISP_F2K_REG_OFFSET K510_RESET_ISP_F2K_TYPE K510_RESET_ISP_F2K_DONE_BIT K510_RESET_ISP_F2K_ASSERT_BIT>,
+             <&sysctl_reset K510_RESET_ISP_R2K_REG_OFFSET K510_RESET_ISP_R2K_TYPE K510_RESET_ISP_R2K_DONE_BIT K510_RESET_ISP_R2K_ASSERT_BIT>,
+             <&sysctl_reset K510_RESET_ISP_TOF_REG_OFFSET K510_RESET_ISP_TOF_TYPE K510_RESET_ISP_TOF_DONE_BIT K510_RESET_ISP_TOF_ASSERT_BIT>,
+             <&sysctl_reset K510_RESET_CSI0_REG_OFFSET K510_RESET_CSI0_TYPE K510_RESET_CSI0_DONE_BIT K510_RESET_CSI0_ASSERT_BIT>,
+             <&sysctl_reset K510_RESET_CSI1_REG_OFFSET K510_RESET_CSI1_TYPE K510_RESET_CSI1_DONE_BIT K510_RESET_CSI1_ASSERT_BIT>,
+             <&sysctl_reset K510_RESET_CSI2_REG_OFFSET K510_RESET_CSI2_TYPE K510_RESET_CSI2_DONE_BIT K510_RESET_CSI2_ASSERT_BIT>,
+             <&sysctl_reset K510_RESET_CSI3_REG_OFFSET K510_RESET_CSI3_TYPE K510_RESET_CSI3_DONE_BIT K510_RESET_CSI3_ASSERT_BIT>,
+             <&sysctl_reset K510_RESET_SENSOR_REG_OFFSET K510_RESET_SENSOR_TYPE K510_RESET_SENSOR_DONE_BIT K510_RESET_SENSOR_ASSERT_BIT>,
+             <&sysctl_reset K510_RESET_MFBC_REG_OFFSET K510_RESET_MFBC_TYPE K510_RESET_MFBC_DONE_BIT K510_RESET_MFBC_ASSERT_BIT>,
+             <&sysctl_reset K510_RESET_MIPI_CORNER_REG_OFFSET K510_RESET_MIPI_CORNER_TYPE K510_RESET_MIPI_CORNER_DONE_BIT K510_RESET_MIPI_CORNER_ASSERT_BIT>;
+    reset-names = "vi_rst","isp_f4k_rst","isp_f2k_rst","isp_r2k_rst","isp_tof_rst","csi0_rst","csi1_rst","csi2_rst","csi3_rst","sensor_rst","mfbc_rst","mipi_corner_rst";
+};
+
+
+&display {
+    resets = <&sysctl_reset K510_RESET_DSI_REG_OFFSET K510_RESET_DSI_TYPE K510_RESET_DSI_DONE_BIT K510_RESET_DSI_ASSERT_BIT>,
+             <&sysctl_reset K510_RESET_BT1120_REG_OFFSET K510_RESET_BT1120_TYPE K510_RESET_BT1120_DONE_BIT K510_RESET_BT1120_ASSERT_BIT>,
+             <&sysctl_reset K510_RESET_TWDO_REG_OFFSET K510_RESET_TWDO_TYPE K510_RESET_TWDO_DONE_BIT K510_RESET_TWDO_ASSERT_BIT>,
+             <&sysctl_reset K510_RESET_VO_REG_OFFSET K510_RESET_VO_TYPE K510_RESET_VO_DONE_BIT K510_RESET_VO_ASSERT_BIT>;
+    reset-names = "dsi_rst","bt1120_rst","twdo_rst","vo_rst";
+};
+
+
+&h264 {
+    resets = <&sysctl_reset K510_RESET_H264_REG_OFFSET K510_RESET_H264_TYPE K510_RESET_H264_DONE_BIT K510_RESET_H264_ASSERT_BIT>;
+    reset-names = "h264_rst";
+};
+
+

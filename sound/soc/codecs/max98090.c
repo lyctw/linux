@@ -1942,7 +1942,11 @@ static int max98090_dai_hw_params(struct snd_pcm_substream *substream,
 	switch (params_width(params)) {
 	case 16:
 		snd_soc_component_update_bits(component, M98090_REG_INTERFACE_FORMAT,
-			M98090_WS_MASK, 0);
+			M98090_WS_MASK, 0);//16bit
+		break;
+    case 32:
+		snd_soc_component_update_bits(component, M98090_REG_INTERFACE_FORMAT,
+			M98090_WS_MASK, 1);//20bit
 		break;
 	default:
 		return -EINVAL;
@@ -2328,7 +2332,7 @@ int max98090_mic_detect(struct snd_soc_component *component,
 EXPORT_SYMBOL_GPL(max98090_mic_detect);
 
 #define MAX98090_RATES SNDRV_PCM_RATE_8000_96000
-#define MAX98090_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE)
+#define MAX98090_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S32_LE)
 
 static const struct snd_soc_dai_ops max98090_dai_ops = {
 	.set_sysclk = max98090_dai_set_sysclk,
@@ -2562,14 +2566,14 @@ static int max98090_i2c_probe(struct i2c_client *i2c,
 		goto err_enable;
 	}
 
-	ret = devm_request_threaded_irq(&i2c->dev, i2c->irq, NULL,
-		max98090_interrupt, IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
-		"max98090_interrupt", max98090);
-	if (ret < 0) {
-		dev_err(&i2c->dev, "request_irq failed: %d\n",
-			ret);
-		return ret;
-	}
+	// ret = devm_request_threaded_irq(&i2c->dev, i2c->irq, NULL,
+	// 	max98090_interrupt, IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+	// 	"max98090_interrupt", max98090);
+	// if (ret < 0) {
+	// 	dev_err(&i2c->dev, "request_irq failed: %d\n",
+	// 		ret);
+	// 	return ret;
+	// }
 
 	ret = devm_snd_soc_register_component(&i2c->dev,
 			&soc_component_dev_max98090, max98090_dai,

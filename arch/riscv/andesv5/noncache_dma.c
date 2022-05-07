@@ -23,7 +23,6 @@
 #include <linux/dma-mapping.h>
 #include <linux/dma-direct.h>
 #include <linux/scatterlist.h>
-#include <linux/highmem.h>
 #include <asm/andesv5/proc.h>
 
 static void dma_flush_page(struct page *page, size_t size)
@@ -44,37 +43,10 @@ static void dma_flush_page(struct page *page, size_t size)
 static inline void cache_op(phys_addr_t paddr, size_t size,
 		void (*fn)(unsigned long start, unsigned long end))
 {
-    struct page *page = pfn_to_page(paddr >> PAGE_SHIFT);
-    unsigned offset = paddr & ~PAGE_MASK;
-    size_t left = size;
-    unsigned long start;
+	unsigned long start;
 
-    do {
-        size_t len = left;
-
-        if (PageHighMem(page)) {
-            void *addr;
-
-            if (offset + len > PAGE_SIZE) {
-                if (offset >= PAGE_SIZE) {
-                    page += offset >> PAGE_SHIFT;
-                    offset &= ~PAGE_MASK;
-                }
-                len = PAGE_SIZE - offset;
-            }
-
-            addr = kmap_atomic(page);
-            start = (unsigned long)(addr + offset);
-            fn(start, start + len);
-            kunmap_atomic(addr);
-        } else {
-            start = (unsigned long)phys_to_virt(paddr);
-            fn(start, start + size);
-        }
-        offset = 0;
-        page++;
-        left -= len;
-    } while (left);
+	start = (unsigned long)phys_to_virt(paddr);
+	fn(start, start + size);
 }
 
 void arch_sync_dma_for_device(struct device *dev, phys_addr_t paddr,
@@ -118,7 +90,7 @@ void *arch_dma_alloc(struct device *dev, size_t size,
 	kvaddr = swiotlb_alloc(dev, size, handle, gfp, attrs);
 	if (!kvaddr)
 		goto no_mem;
-	coherent_kvaddr = ioremap_nocache(dma_to_phys(dev, *handle), size);
+	coherent_kvaddr = dma_remap(dma_to_phys(dev, *handle), size);
 	if (!coherent_kvaddr)
 		goto no_map;
 
@@ -136,7 +108,7 @@ void arch_dma_free(struct device *dev, size_t size, void *vaddr,
 	void *swiotlb_addr = phys_to_virt(dma_to_phys(dev, handle));
 
 	size = PAGE_ALIGN(size);
-	iounmap(vaddr);
+	dma_unmap(vaddr);
 	swiotlb_free(dev, size, swiotlb_addr, handle, attrs);
 
 	return;
@@ -240,10 +212,62 @@ static void dma_riscv_swiotlb_sync_sg_for_device(struct device *dev,
 		arch_sync_dma_for_device(dev,dma_to_phys(dev, sg->dma_address),
 				       sg->length, dir);
 }
+
+int arch_dma_mmap(struct device *dev,
+			struct vm_area_struct *vma,
+			void *cpu_addr, dma_addr_t dma_addr, size_t size,
+			unsigned long attrs)
+{
+	int ret = -ENXIO;
+	unsigned long nr_vma_pages = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
+	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+	// unsigned long pfn = dma_to_pfn(dev, dma_addr);
+	unsigned long pfn = dma_addr >> PAGE_SHIFT;
+	unsigned long off = vma->vm_pgoff;
+
+	// vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot);
+
+	// if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
+	// 	return ret;
+	if (off < nr_pages && nr_vma_pages <= (nr_pages - off)) {
+		ret = remap_pfn_range(vma, vma->vm_start,
+				      pfn + off,
+				      vma->vm_end - vma->vm_start,
+				      vma->vm_page_prot);
+	}
+	return ret;
+}
+
+int dma_riscv_swiotbl_get_sgtable(struct device *dev, struct sg_table *sgt,
+		 void *cpu_addr, dma_addr_t handle, size_t size,
+		 unsigned long attrs)
+{
+	unsigned long pfn;
+	struct page *page;
+	int ret;
+
+	pfn = handle >> PAGE_SHIFT;;
+
+	/* If the PFN is not valid, we do not have a struct page */
+	if (!pfn_valid(pfn))
+		return -ENXIO;
+
+	page = pfn_to_page(pfn);
+
+	ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
+	if (unlikely(ret))
+		return ret;
+
+	sg_set_page(sgt->sgl, page, PAGE_ALIGN(size), 0);
+	return 0;
+}
+
 const struct dma_map_ops swiotlb_noncoh_dma_ops = {
 	.alloc			= arch_dma_alloc,
 	.free			= arch_dma_free,
+	.mmap			= arch_dma_mmap,
 	.dma_supported	     	= swiotlb_dma_supported,
+	.get_sgtable    = dma_riscv_swiotbl_get_sgtable,
 	.map_page		= dma_riscv_swiotlb_map_page,
 	.map_sg			= dma_riscv_swiotlb_map_sg,
 	.unmap_page		= dma_riscv_swiotlb_unmap_page,

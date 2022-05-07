@@ -6,9 +6,7 @@
 #include <linux/of_device.h>
 #include <linux/cacheinfo.h>
 #include <linux/sizes.h>
-#include <linux/smp.h>
 #include <asm/csr.h>
-#include <asm/sbi.h>
 #include <asm/io.h>
 #include <asm/andesv5/proc.h>
 #include <asm/andesv5/csr.h>
@@ -21,7 +19,7 @@
 #define SEL_PER_CTL	8
 #define SEL_OFF(id)	(8 * (id % 8))
 
-void __iomem *l2c_base;
+extern void __iomem *l2c_base;
 
 DEFINE_PER_CPU(struct andesv5_cache_info, cpu_cache_info) = {
 	.init_done = 0,
@@ -56,6 +54,7 @@ inline int get_cache_line_size(void)
 	return cpu_ci->dcache_line_size;
 }
 
+
 static uint32_t cpu_l2c_get_cctl_status(void)
 {
 	return readl((void*)(l2c_base + L2C_REG_STATUS_OFFSET));
@@ -65,6 +64,7 @@ void cpu_dcache_wb_range(unsigned long start, unsigned long end, int line_size)
 {
 	int mhartid = get_cpu();
 	unsigned long pa;
+
 	while (end > start) {
 		custom_csr_write(CCTL_REG_UCCTLBEGINADDR_NUM, start);
 		custom_csr_write(CCTL_REG_UCCTLCOMMAND_NUM, CCTL_L1D_VA_WB);
@@ -86,6 +86,7 @@ void cpu_dcache_inval_range(unsigned long start, unsigned long end, int line_siz
 {
 	int mhartid = get_cpu();
 	unsigned long pa;
+
 	while (end > start) {
 		custom_csr_write(CCTL_REG_UCCTLBEGINADDR_NUM, start);
 		custom_csr_write(CCTL_REG_UCCTLCOMMAND_NUM, CCTL_L1D_VA_INVAL);
@@ -104,8 +105,8 @@ void cpu_dcache_inval_range(unsigned long start, unsigned long end, int line_siz
 }
 void cpu_dma_inval_range(unsigned long start, unsigned long end)
 {
-        unsigned long flags;
-        unsigned long line_size = get_cache_line_size();
+	unsigned long flags;
+	unsigned long line_size = get_cache_line_size();
 	unsigned long old_start = start;
 	unsigned long old_end = end;
 	char cache_buf[2][MAX_CACHE_LINE_SIZE]={0};
@@ -128,9 +129,9 @@ void cpu_dma_inval_range(unsigned long start, unsigned long end)
 		memcpy((void *)start, &cache_buf[0][0], (old_start & (line_size - 1)));
 	}
 	if (unlikely(end != old_end)) {
-		memcpy((void *)(old_end + 1), &cache_buf[1][(old_end & (line_size - 1)) + 1], end - old_end - 1);
+		memcpy((void *)(old_end), &cache_buf[1][(old_end & (line_size - 1))], end - old_end);
 	}
-        local_irq_restore(flags);
+	local_irq_restore(flags);
 
 }
 EXPORT_SYMBOL(cpu_dma_inval_range);
@@ -140,178 +141,176 @@ void cpu_dma_wb_range(unsigned long start, unsigned long end)
 	unsigned long flags;
 	unsigned long line_size = get_cache_line_size();
 
-        local_irq_save(flags);
+	local_irq_save(flags);
 	start = start & (~(line_size - 1));
 	cpu_dcache_wb_range(start, end, line_size);
-        local_irq_restore(flags);
+	local_irq_restore(flags);
 }
 EXPORT_SYMBOL(cpu_dma_wb_range);
 
-/* L1 Cache */
-int cpu_l1c_status(void)
+void k510_sharemem_dcache_inval_range(unsigned long va_start, unsigned long pa_start, unsigned long va_end, int line_size)
 {
-	return SBI_CALL_0(SBI_L1CACHE_STATUS);
+	int mhartid = get_cpu();
+
+	while (va_end > va_start) {
+		custom_csr_write(CCTL_REG_UCCTLBEGINADDR_NUM, va_start);
+		custom_csr_write(CCTL_REG_UCCTLCOMMAND_NUM, CCTL_L1D_VA_INVAL);
+
+		if (l2c_base) {
+			writel(pa_start, (void*)(l2c_base + L2C_REG_CN_ACC_OFFSET(mhartid)));
+			writel(CCTL_L2_PA_INVAL, (void*)(l2c_base + L2C_REG_CN_CMD_OFFSET(mhartid)));
+			while ((cpu_l2c_get_cctl_status() & CCTL_L2_STATUS_CN_MASK(mhartid))
+				!= CCTL_L2_STATUS_IDLE);
+		}
+
+		va_start += line_size;
+		pa_start += line_size;
+	}
+	put_cpu();
 }
 
-void cpu_icache_enable(void *info)
+void k510_sharemem_inval_range(unsigned long va_start, unsigned long pa_start, unsigned long size)
 {
 	unsigned long flags;
+	unsigned long line_size = get_cache_line_size();
+	unsigned long va_end = va_start + size;
+	unsigned long old_va_start = va_start;
+	unsigned long old_va_end = va_end;
+	unsigned long old_pa_start = pa_start;
+	char cache_buf[2][MAX_CACHE_LINE_SIZE]={0};
 
-	local_irq_save(flags);
-	SBI_CALL_1(SBI_ICACHE_OP, 1);
-    local_irq_restore(flags);
-}
+	if (unlikely(va_start == va_end))
+		return;
 
-void cpu_icache_disable(void *info)
-{
-	unsigned long flags;
+	va_start = va_start & (~(line_size - 1));
+	va_end = ((va_end + line_size - 1) & (~(line_size - 1)));
 
-	local_irq_save(flags);
-	SBI_CALL_1(SBI_ICACHE_OP, 0);
-    local_irq_restore(flags);
-}
+	pa_start = pa_start & (~(line_size - 1));
 
-void cpu_dcache_enable(void *info)
-{
-	unsigned long flags;
+    local_irq_save(flags);
 
-	local_irq_save(flags);
-	SBI_CALL_1(SBI_DCACHE_OP, 1);
-    local_irq_restore(flags);
-}
+	__asm__ __volatile__(
+        "li t6, 0x00040000\t\n"
+        "csrs sstatus, t6\t\n"
+    );
 
-void cpu_dcache_disable(void *info)
-{
-	unsigned long flags;
+	if (unlikely(va_start != old_va_start)) {
+		memcpy(&cache_buf[0][0], (void *)va_start, line_size);
+	}
+	if (unlikely(va_end != old_va_end)) {
+		memcpy(&cache_buf[1][0], (void *)(old_va_end & (~(line_size - 1))), line_size);
+	}
+	k510_sharemem_dcache_inval_range(va_start, pa_start, va_end, line_size);
+	if (unlikely(va_start != old_va_start)) {
+		memcpy((void *)va_start, &cache_buf[0][0], (old_va_start & (line_size - 1)));
+	}
+	if (unlikely(va_end != old_va_end)) {
+		memcpy((void *)(old_va_end), &cache_buf[1][(old_va_end & (line_size - 1))], va_end - old_va_end);
+	}
 
-	local_irq_save(flags);
-	SBI_CALL_1(SBI_DCACHE_OP, 0);
+	__asm__ __volatile__(
+        "li t6, 0x00040000\t\n"
+        "csrc sstatus, t6\t\n"
+    );
 	local_irq_restore(flags);
 }
+EXPORT_SYMBOL(k510_sharemem_inval_range);
+
+void k510_sharemem_dcache_wb_range(unsigned long va_start, unsigned long pa_start, unsigned long va_end, int line_size)
+{
+	int mhartid = get_cpu();
+#if 0
+	asm volatile ("fence.i");
+	custom_csr_write(CCTL_REG_UCCTLCOMMAND_NUM, CCTL_L1D_INVAL_ALL);
+	if (l2c_base) {
+		writel(CCTL_L2_FENCE, (void*)(l2c_base + L2C_REG_CN_CMD_OFFSET(mhartid)));
+		while ((cpu_l2c_get_cctl_status() & CCTL_L2_STATUS_CN_MASK(mhartid))
+			!= CCTL_L2_STATUS_IDLE);
+	}
+#else
+	while (va_end > va_start) {
+		custom_csr_write(CCTL_REG_UCCTLBEGINADDR_NUM, va_start);
+		custom_csr_write(CCTL_REG_UCCTLCOMMAND_NUM, CCTL_L1D_VA_WB);
+
+		if (l2c_base) {
+			writel(pa_start, (void*)(l2c_base + L2C_REG_CN_ACC_OFFSET(mhartid)));
+			writel(CCTL_L2_PA_WB, (void*)(l2c_base + L2C_REG_CN_CMD_OFFSET(mhartid)));
+			while ((cpu_l2c_get_cctl_status() & CCTL_L2_STATUS_CN_MASK(mhartid))
+				!= CCTL_L2_STATUS_IDLE);
+		}
+
+		va_start += line_size;
+		pa_start += line_size;
+	}
+#endif
+	put_cpu();
+}
+
+void k510_sharemem_wb_range(unsigned long va_start, unsigned long pa_start, unsigned long size)
+{
+	unsigned long flags;
+	unsigned long line_size = get_cache_line_size();
+	unsigned long va_end = va_start + size;
+
+	local_irq_save(flags);
+	__asm__ __volatile__(
+        "li t6, 0x00040000\t\n"
+        "csrs sstatus, t6\t\n"
+    );
+	va_start = va_start & (~(line_size - 1));
+	pa_start = pa_start & (~(line_size - 1));
+	k510_sharemem_dcache_wb_range(va_start, pa_start, va_end, line_size);
+	__asm__ __volatile__(
+        "li t6, 0x00040000\t\n"
+        "csrc sstatus, t6\t\n"
+    );
+	local_irq_restore(flags);
+}
+EXPORT_SYMBOL(k510_sharemem_wb_range);
 
 /* L2 Cache */
-uint32_t cpu_l2c_ctl_status(void)
-{
-	return readl((void*)(l2c_base + L2C_REG_CTL_OFFSET));
-}
-
-void cpu_l2c_disable(void)
-{
-#ifdef CONFIG_SMP
-	int mhartid = get_cpu();
-#else
-	int mhartid = 0;
-#endif
-	unsigned int val;
-	unsigned long flags;
-
-	/*No l2 cache */
-	if(!l2c_base)
-		return;
-
-	/*l2 cache has disabled*/
-	if(!(cpu_l2c_ctl_status() & L2_CACHE_CTL_mskCEN))
-		return;
-
-	local_irq_save(flags);
-
-	/*Disable L2 cache*/
-	val = readl((void*)(l2c_base + L2C_REG_CTL_OFFSET));
-	val &= (~L2_CACHE_CTL_mskCEN);
-
-	writel(val, (void*)(l2c_base + L2C_REG_CTL_OFFSET));
-	while ((cpu_l2c_get_cctl_status() & CCTL_L2_STATUS_CN_MASK(mhartid))
-	       != CCTL_L2_STATUS_IDLE);
-
-	/*L2 write-back and invalidate all*/
-	writel(CCTL_L2_WBINVAL_ALL, (void*)(l2c_base + L2C_REG_CN_CMD_OFFSET(mhartid)));
-	while ((cpu_l2c_get_cctl_status() & CCTL_L2_STATUS_CN_MASK(mhartid))
-	       != CCTL_L2_STATUS_IDLE);
-
-	local_irq_restore(flags);
-    #ifdef CONFIG_SMP
-    put_cpu();
-    #endif
-}
 
 #ifndef CONFIG_SMP
-void cpu_l2c_inval_range(unsigned long pa, unsigned long size)
+void cpu_l2c_inval_range(unsigned long base, unsigned long pa)
 {
-	unsigned long line_size = get_cache_line_size();
-    unsigned long start = pa, end = pa + size;
-    unsigned long align_start, align_end;
-
-    align_start = start & ~(line_size - 1);
-    align_end  = (end + line_size - 1) & ~(line_size - 1);
-
-    while(align_end > align_start){
-        writel(align_start, (void*)(l2c_base + L2C_REG_C0_ACC_OFFSET));
-        writel(CCTL_L2_PA_INVAL, (void*)(l2c_base + L2C_REG_C0_CMD_OFFSET));
-        while ((cpu_l2c_get_cctl_status() & CCTL_L2_STATUS_C0_MASK)
-                != CCTL_L2_STATUS_IDLE);
-        align_start += line_size;
-	}
+	writel(pa, (void*)(base + L2C_REG_C0_ACC_OFFSET));
+	writel(CCTL_L2_PA_INVAL, (void*)(base + L2C_REG_C0_CMD_OFFSET));
+	while ((cpu_l2c_get_cctl_status() & CCTL_L2_STATUS_C0_MASK)
+	       != CCTL_L2_STATUS_IDLE);
 }
+
 EXPORT_SYMBOL(cpu_l2c_inval_range);
 
-void cpu_l2c_wb_range(unsigned long pa, unsigned long size)
+void cpu_l2c_wb_range(unsigned long base, unsigned long pa)
 {
-    unsigned long line_size = get_cache_line_size();
-    unsigned long start = pa, end = pa + size;
-    unsigned long align_start, align_end;
-
-    align_start = start & ~(line_size - 1);
-    align_end  = (end + line_size - 1) & ~(line_size - 1);
-
-    while(align_end > align_start){
-        writel(align_start, (void*)(l2c_base + L2C_REG_C0_ACC_OFFSET));
-        writel(CCTL_L2_PA_WB, (void*)(l2c_base + L2C_REG_C0_CMD_OFFSET));
-        while ((cpu_l2c_get_cctl_status() & CCTL_L2_STATUS_C0_MASK)
-                != CCTL_L2_STATUS_IDLE);
-        align_start += line_size;
-    }
+	writel(pa, (void*)(base + L2C_REG_C0_ACC_OFFSET));
+	writel(CCTL_L2_PA_WB, (void*)(base + L2C_REG_C0_CMD_OFFSET));
+	while ((cpu_l2c_get_cctl_status() & CCTL_L2_STATUS_C0_MASK)
+	       != CCTL_L2_STATUS_IDLE);
 }
 EXPORT_SYMBOL(cpu_l2c_wb_range);
 #else
-void cpu_l2c_inval_range(unsigned long pa, unsigned long size)
+void cpu_l2c_inval_range(unsigned long base, unsigned long pa)
 {
-    int mhartid = get_cpu();
-    unsigned long line_size = get_cache_line_size();
-    unsigned long start = pa, end = pa + size;
-    unsigned long align_start, align_end;
-
-    align_start = start & ~(line_size - 1);
-    align_end  = (end + line_size - 1) & ~(line_size - 1);
-
-    while(align_end > align_start){
-        writel(align_start, (void*)(l2c_base + L2C_REG_CN_ACC_OFFSET(mhartid)));
-        writel(CCTL_L2_PA_INVAL, (void*)(l2c_base + L2C_REG_CN_CMD_OFFSET(mhartid)));
-        while ((cpu_l2c_get_cctl_status() & CCTL_L2_STATUS_CN_MASK(mhartid))
-                != CCTL_L2_STATUS_IDLE);
-        align_start += line_size;
-    }
-    put_cpu();
+	int mhartid = get_cpu();
+//	int mhartid = smp_processor_id();
+	writel(pa, (void*)(base + L2C_REG_CN_ACC_OFFSET(mhartid)));
+	writel(CCTL_L2_PA_INVAL, (void*)(base + L2C_REG_CN_CMD_OFFSET(mhartid)));
+	while ((cpu_l2c_get_cctl_status() & CCTL_L2_STATUS_CN_MASK(mhartid))
+	       != CCTL_L2_STATUS_IDLE);
+        put_cpu();
 }
 EXPORT_SYMBOL(cpu_l2c_inval_range);
 
-void cpu_l2c_wb_range(unsigned long pa, unsigned long size)
+void cpu_l2c_wb_range(unsigned long base, unsigned long pa)
 {
-    int mhartid = get_cpu();
-    unsigned long line_size = get_cache_line_size();
-    unsigned long start = pa, end = pa + size;
-    unsigned long align_start, align_end;
-
-    align_start = start & ~(line_size - 1);
-    align_end  = (end + line_size - 1) & ~(line_size - 1);
-
-    while(align_end > align_start){
-        writel(align_start, (void*)(l2c_base + L2C_REG_CN_ACC_OFFSET(mhartid)));
-        writel(CCTL_L2_PA_WB, (void*)(l2c_base + L2C_REG_CN_CMD_OFFSET(mhartid)));
-        while ((cpu_l2c_get_cctl_status() & CCTL_L2_STATUS_CN_MASK(mhartid))
-                != CCTL_L2_STATUS_IDLE);
-        align_start += line_size;
-    }
-    put_cpu();
+	int mhartid = get_cpu();
+//	int mhartid = smp_processor_id();
+	writel(pa, (void*)(base + L2C_REG_CN_ACC_OFFSET(mhartid)));
+	writel(CCTL_L2_PA_WB, (void*)(base + L2C_REG_CN_CMD_OFFSET(mhartid)));
+	while ((cpu_l2c_get_cctl_status() & CCTL_L2_STATUS_CN_MASK(mhartid))
+	       != CCTL_L2_STATUS_IDLE);
+        put_cpu();
 }
 EXPORT_SYMBOL(cpu_l2c_wb_range);
 #endif
@@ -325,7 +324,7 @@ int cpu_l2c_get_counter_idx(struct l2c_hw_events *l2c)
 	return idx;
 }
 
-void l2c_write_counter(int idx, u64 value)
+void l2c_write_counter(int idx, u64 value, void __iomem *l2c_base)
 {
 	u32 vall = value;
 	u32 valh = value >> 32;
@@ -334,7 +333,7 @@ void l2c_write_counter(int idx, u64 value)
 	writel(valh, (void*)(l2c_base + L2C_REG_CN_HPM_OFFSET(idx) + 0x4));
 }
 
-u64 l2c_read_counter(int idx)
+u64 l2c_read_counter(int idx, void __iomem *l2c_base)
 {
 	u32 vall = readl((void*)(l2c_base + L2C_REG_CN_HPM_OFFSET(idx)));
 	u32 valh = readl((void*)(l2c_base + L2C_REG_CN_HPM_OFFSET(idx) + 0x4));
@@ -343,7 +342,7 @@ u64 l2c_read_counter(int idx)
 	return val;
 }
 
-void l2c_pmu_disable_counter(int idx)
+void l2c_pmu_disable_counter(int idx, void __iomem *l2c_base)
 {
 	int n = idx / SEL_PER_CTL;
 	u32 vall = readl((void*)(l2c_base + L2C_HPM_CN_CTL_OFFSET(n)));
@@ -358,7 +357,7 @@ void l2c_pmu_disable_counter(int idx)
 }
 
 #ifndef CONFIG_SMP
-void l2c_pmu_event_enable(u64 config, int idx)
+void l2c_pmu_event_enable(u64 config, int idx, void __iomem *l2c_base)
 {
 	int n = idx / SEL_PER_CTL;
 	u32 vall = readl((void*)(l2c_base + L2C_HPM_CN_CTL_OFFSET(n)));
@@ -373,7 +372,7 @@ void l2c_pmu_event_enable(u64 config, int idx)
 	writel(valh, (void*)(l2c_base + L2C_HPM_CN_CTL_OFFSET(n) + 0x4));
 }
 #else
-void l2c_pmu_event_enable(u64 config, int idx)
+void l2c_pmu_event_enable(u64 config, int idx, void __iomem *l2c_base)
 {
 	int n = idx / SEL_PER_CTL;
 	int mhartid = get_cpu();
@@ -394,14 +393,3 @@ void l2c_pmu_event_enable(u64 config, int idx)
 }
 #endif
 #endif
-
-int __init l2c_init(void)
-{
-	struct device_node *node ;
-
-	node = of_find_compatible_node(NULL, NULL, "cache");
-	l2c_base = of_iomap(node, 0);
-
-	return 0;
-}
-arch_initcall(l2c_init)

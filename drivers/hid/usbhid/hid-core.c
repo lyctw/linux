@@ -1026,7 +1026,7 @@ static int usbhid_parse(struct hid_device *hid)
 	if (!rdesc)
 		return -ENOMEM;
 
-	hid_set_idle(dev, interface->desc.bInterfaceNumber, 0, 0);
+	//hid_set_idle(dev, interface->desc.bInterfaceNumber, 0, 0);
 
 	ret = hid_get_class_descriptor(dev, interface->desc.bInterfaceNumber,
 			HID_DT_REPORT, rdesc, rsize);

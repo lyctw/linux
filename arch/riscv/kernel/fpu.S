@@ -101,6 +101,7 @@ ENTRY(__fstate_restore)
 	fld f30, TASK_THREAD_F30_F0(a0)
 	fld f31, TASK_THREAD_F31_F0(a0)
 	fscsr t0
+#	fsrmi 1  /* generate load page fault */
 	csrc sstatus, t1
 	ret
 ENDPROC(__fstate_restore)

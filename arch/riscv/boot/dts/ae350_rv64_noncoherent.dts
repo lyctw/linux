@@ -105,13 +105,6 @@
     interrupt-parent = <&plic0>;
   };
 
-  gpio0: gpio@f0700000 {
-    compatible = "andestech,atcgpio100";
-    reg = <0x0 0xf0700000 0x0 0x00001000>;
-    interrupts = <7 4>;
-    interrupt-parent = <&plic0>;
-  };
-
   rtc0: rtc@f0600000 {
     compatible = "andestech,atcrtc100";
     reg = <0x0 0xf0600000 0x0 0x1000>;
@@ -143,18 +136,6 @@
     reg = <0x0 0xf0c00000 0x0 0x1000>;
     interrupts = <10 4 64 4 65 4 66 4 67 4 68 4 69 4 70 4 71 4>;
     dma-channels = <8>;
-    interrupt-parent = <&plic0>;
-  };
-
-  smu: smu@f0100000 {
-    compatible = "andestech,atcsmu";
-    reg = <0x0 0xf0100000 0x0 0x1000>;
-  };
-
-  wdt0: wdt@f0500000 {
-    compatible = "andestech,atcwdt200";
-    reg = <0x0 0xf0500000 0x0 0x1000>;
-    clock-frequency = <15000000>;
     interrupt-parent = <&plic0>;
   };
 
@@ -256,18 +237,11 @@
     interrupts = <4 4>;
     interrupt-parent = <&plic0>;
     flash@0 {
-      compatible = "mx25u1635e", "jedec,spi-nor";
+      compatible = "spi-flash";
       spi-max-frequency = <50000000>;
       reg = <0>;
       spi-cpol;
       spi-cpha;
     };
-  };
-
-  i2c: i2c@f0a00000 {
-    compatible = "andestech,atciic100";
-    reg = <0x0 0xf0a00000 0x0 0x1000>;
-    interrupts = <6 4>;
-    interrupt-parent = <&plic0>;
   };
 };

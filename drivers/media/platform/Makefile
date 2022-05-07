@@ -92,3 +92,6 @@ obj-$(CONFIG_VIDEO_QCOM_CAMSS)		+= qcom/camss-8x16/
 obj-$(CONFIG_VIDEO_QCOM_VENUS)		+= qcom/venus/
 
 obj-y					+= meson/
+
+obj-$(CONFIG_K510_ISP_TEST_DRIVER)		+= canaan/
+obj-$(CONFIG_VIDEO_CANAAN_K510)		+= canaan-isp/

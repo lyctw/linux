@@ -1,0 +1,23 @@
+config CRYPTO_DEV_KENDRYTE_TRNG
+	tristate "Support for KENDRYTE TRNG hardware"
+	select CRYPTO_RNG
+	help
+          This driver interfaces with the TRNG hardware.
+
+config CRYPTO_DEV_KENDRYTE_HASH
+	tristate "Support for KENDRYTE hash accelerators"
+	select CRYPTO_HASH
+	select CRYPTO_SHA256
+	help
+          This driver interfaces with the hardware hash accelerator. 
+	  Supporting SHA256 hashing algorithm.
+
+config CRYPTO_DEV_KENDRYTE_CRYP
+	tristate "Support for KENDRYTE cryp accelerators"
+	select CRYPTO_AES
+	select CRYPTO_BLKCIPHER
+	help
+          This driver interfaces with the hardware crypto accelerator.
+	  Supporting cbc/ecb/ofb/cfb/gcm.
+
+

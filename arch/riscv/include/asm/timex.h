@@ -15,9 +15,15 @@
 #define _ASM_RISCV_TIMEX_H
 
 #include <asm/param.h>
+#include <asm/plmt.h>
 
 typedef unsigned long cycles_t;
 
+//extern uint64_t riscv_time_val;
+
+//#define mmio_get_cycles()  sbi_get_cycles
+
+#if 0
 static inline notrace cycles_t get_cycles_inline(void)
 {
 	cycles_t n;
@@ -27,14 +33,22 @@ static inline notrace cycles_t get_cycles_inline(void)
 		: "=r" (n));
 	return n;
 }
-#define get_cycles get_cycles_inline
+#endif
+
+static inline cycles_t get_cycles(void)
+{
+        return sbi_get_cycles();
+}
+
+#define get_cycles get_cycles
+//#define get_cycles get_cycles_inline
 
 #ifdef CONFIG_64BIT
 static inline notrace uint64_t get_cycles64(void)
 {
         return get_cycles();
 }
-#else
+#else /* CONFIG_64BIT */
 static inline notrace uint64_t get_cycles64(void)
 {
 	u32 lo, hi, tmp;
@@ -47,7 +61,7 @@ static inline notrace uint64_t get_cycles64(void)
 		: "=&r" (hi), "=&r" (lo), "=&r" (tmp));
 	return ((u64)hi << 32) | lo;
 }
-#endif
+#endif /* CONFIG_64BIT */
 
 #define ARCH_HAS_READ_CURRENT_TIMER
 

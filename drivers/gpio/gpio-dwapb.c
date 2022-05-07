@@ -216,8 +216,10 @@ static void dwapb_irq_handler(struct irq_desc *desc)
 
 	dwapb_do_irq(gpio);
 
+#ifndef CONFIG_RISCV
 	if (chip->irq_eoi)
 		chip->irq_eoi(irq_desc_get_irq_data(desc));
+#endif
 }
 
 static void dwapb_irq_enable(struct irq_data *d)

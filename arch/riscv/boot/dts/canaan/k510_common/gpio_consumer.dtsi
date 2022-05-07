@@ -1,0 +1,43 @@
+/*
+&i2c_gpio {
+    sda-gpios = <&porta 0 0>;
+    scl-gpios = <&porta 1 0>;
+    i2c-gpio,delay-us = <2>;
+};
+
+
+&pwm_gpio {
+    #pwm-cells = <3>;
+    pwm-gpios = <&porta 2 0>,
+                <&porta 3 0>;
+};
+
+&sdio2 {
+    //cd-gpios = <&pca6416_0 14 GPIO_ACTIVE_LOW>;
+};
+*/
+/*
+&isp {
+   dsi_en-gpios = <&pca6416_0 12 GPIO_ACTIVE_HIGH>;
+   dsi_rest-gpios = <&pca6416_0 3 GPIO_ACTIVE_LOW>;
+   csi_en-gpios = <&pca6416_0 4 GPIO_ACTIVE_HIGH>;
+
+   imx385_powerdown-gpios = <&porta 0 GPIO_ACTIVE_HIGH>;
+   imx385_reset-gpios = <&porta 1 GPIO_ACTIVE_HIGH>;
+
+   irs3281_powerdown-gpios = <&porta 2 GPIO_ACTIVE_HIGH>;
+   irs3281_reset-gpios = <&porta 3 GPIO_ACTIVE_HIGH>;
+
+   dvp_powerdown-gpios = <&porta 4 GPIO_ACTIVE_HIGH>;
+   
+};
+
+*/
+
+&manage_subsys {
+    emmc_pwrseq: emmc-pwrseq {
+        compatible = "mmc-pwrseq-emmc";
+        reset-gpios = <&pca6416_2 9 GPIO_ACTIVE_LOW>;
+    };
+};
+

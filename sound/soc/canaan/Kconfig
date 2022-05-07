@@ -1,0 +1,19 @@
+config SND_SOC_CANAAN_MAX98090
+	tristate "ASoC support for CANAAN boards using a MAX98090 codec"
+	depends on I2C && GPIOLIB && CLKDEV_LOOKUP
+	help
+	  Say Y or M here if you want to add support for SoC audio on CANAAN
+	  boards using the MAX98090 codec.
+
+config SND_SOC_CANAAN_NAU8822
+	tristate "ASoC support for CANAAN boards using a NAU8822 codec"
+	depends on I2C && GPIOLIB && CLKDEV_LOOKUP
+	help
+	  Say Y or M here if you want to add support for SoC audio on CANAAN
+	  boards using the NAU8822 codec.
+
+config SND_SOC_CANAAN_AUDIO
+	tristate "CANAAN AUDIO interface support"
+	help
+	  Say Y or M here if you want to enable audio for canaan soc.
+

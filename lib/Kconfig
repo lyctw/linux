@@ -301,7 +301,7 @@ config DECOMPRESS_LZ4
 # Generic allocator support is selected if needed
 #
 config GENERIC_ALLOCATOR
-	bool
+	bool "GENERIC ALLOCATOR"
 
 #
 # reed solomon support is select'ed if needed

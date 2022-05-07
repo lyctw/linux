@@ -1,0 +1,11 @@
+    config K510_GNNE_DRIVER
+        tristate "K510 GNNE test driver"
+        depends on HAS_DMA
+        depends on HAS_IOMEM
+        help
+          Say Y for enabling the k510 gnne test driver
+
+          To compile this support as a module, choose M here:
+          The module will be called allegro_encoder.
+          If unsure, say N.
+

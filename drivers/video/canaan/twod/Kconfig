@@ -1,0 +1,12 @@
+menuconfig KENDRYTE_TWOD_SUPPORT
+        bool "kendryte twod device support"
+        help
+          Enable this to be able to choose the drivers for controlling the
+          twod on some platforms, for example on PDAs.
+
+
+config KENDRYTE_TWOD
+	tristate "kendryte twod"
+	help
+	  kendryte 510 twod module.
+

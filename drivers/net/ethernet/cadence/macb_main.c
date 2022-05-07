@@ -35,6 +35,7 @@
 #include <linux/ip.h>
 #include <linux/udp.h>
 #include <linux/tcp.h>
+#include <linux/pm_runtime.h>
 #include "macb.h"
 
 #define MACB_RX_BUFFER_SIZE	128
@@ -3815,6 +3816,16 @@ static const struct macb_config zynq_config = {
 	.init = macb_init,
 };
 
+static const struct macb_config k510_config = {
+        .caps = MACB_CAPS_GIGABIT_MODE_AVAILABLE | MACB_CAPS_USRIO_DISABLED |
+                        MACB_CAPS_JUMBO |
+                        MACB_CAPS_GEM_HAS_PTP,
+        .dma_burst_length = 16,
+        .clk_init = macb_clk_init,
+        .init = macb_init,
+        .jumbo_max_len = 10240,
+};
+
 static const struct of_device_id macb_dt_ids[] = {
 	{ .compatible = "cdns,at32ap7000-macb" },
 	{ .compatible = "cdns,at91sam9260-macb", .data = &at91sam9260_config },
@@ -3829,6 +3840,7 @@ static const struct of_device_id macb_dt_ids[] = {
 	{ .compatible = "cdns,emac", .data = &emac_config },
 	{ .compatible = "cdns,zynqmp-gem", .data = &zynqmp_config},
 	{ .compatible = "cdns,zynq-gem", .data = &zynq_config },
+	{ .compatible = "cdns,k510-gem", .data = &k510_config },
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, macb_dt_ids);
@@ -3854,7 +3866,6 @@ static int macb_probe(struct platform_device *pdev)
 	struct device_node *np = pdev->dev.of_node;
 	struct clk *pclk, *hclk = NULL, *tx_clk = NULL, *rx_clk = NULL;
 	unsigned int queue_mask, num_queues;
-	struct macb_platform_data *pdata;
 	bool native_io;
 	struct phy_device *phydev;
 	struct net_device *dev;
@@ -3862,6 +3873,10 @@ static int macb_probe(struct platform_device *pdev)
 	void __iomem *mem;
 	const char *mac;
 	struct macb *bp;
+	unsigned int clock_config_reg;
+	unsigned int *addr;
+	unsigned int reg;
+	const char *phy_mode_str;
 	int err;
 
 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
@@ -3963,16 +3978,58 @@ static int macb_probe(struct platform_device *pdev)
 		}
 	}
 
-	err = of_get_phy_mode(np);
-	if (err < 0) {
-		pdata = dev_get_platdata(&pdev->dev);
-		if (pdata && pdata->is_rmii)
-			bp->phy_interface = PHY_INTERFACE_MODE_RMII;
-		else
-			bp->phy_interface = PHY_INTERFACE_MODE_MII;
-	} else {
-		bp->phy_interface = err;
+	err = of_property_read_u32(pdev->dev.of_node, "clock-config", &clock_config_reg);
+	if(err < 0) {
+		dev_err(&pdev->dev, "parse clock config error (%u).\n", err);
+        return -ENODEV;
+    }
+
+    addr = ioremap(clock_config_reg, 0x04);
+    reg = readl(addr);
+
+	err = of_property_read_string(np, "phy-mode", &phy_mode_str);
+	if(err < 0){
+		dev_err(&pdev->dev, "parse phy mode error (%u).\n", err);
+		goto err_out_free_netdev;
 	}
+
+	if(!strcmp(phy_mode_str, "mii"))
+	{
+		bp->phy_interface = PHY_INTERFACE_MODE_MII;
+
+		reg |= (1 << 6) | (1 << 27);    /* EMAC_TRX_CLK_CFG.emac_refclk_en = 1 enable emac_phy_refclk*/
+		reg |= (1 << 9) | (1 << 30);    /* EMAC_TRX_CLK_CFG.emac_refclk_oen = 1  Reference Clock input enable*/
+		reg &= ~(1 << 7);
+		reg |= (1 << 28);               /* EMAC host controller Tx Clock source selection in MII or RGMII mode. */
+		reg |= (1 << 8) | (1 << 29);    /* EMAC_TRX_CLK_CFG.emac_txclk_sel = 0   using the Reference Clock in RMII mode*/
+	}
+	else if(!strcmp(phy_mode_str, "rmii"))
+	{
+		bp->phy_interface = PHY_INTERFACE_MODE_RMII;
+
+		reg |= (1 << 6) | (1 << 27);	/* EMAC_TRX_CLK_CFG.emac_refclk_en = 1 enable emac_phy_refclk*/
+		reg |= (1 << 9) | (1 << 30);	/* EMAC_TRX_CLK_CFG.emac_refclk_oen = 0  Reference Clock output enable*/
+		reg &= ~(1 << 8);
+		reg |= 1 << 29;                 /* EMAC_TRX_CLK_CFG.emac_txclk_sel = 0   using the Reference Clock in RMII mode*/
+	}
+	else if(!strcmp(phy_mode_str, "rgmii"))
+	{
+		bp->phy_interface = PHY_INTERFACE_MODE_RGMII;
+
+		reg |= (1 << 6) | (1 << 27);    /* EMAC_TRX_CLK_CFG.emac_refclk_en = 1 enable emac_phy_refclk*/
+		reg |= (1 << 9) | (1 << 30);    /* EMAC_TRX_CLK_CFG.emac_refclk_oen = 1  Reference Clock input enable*/
+
+		reg |= (1 << 7) | (1 << 28);    /* EMAC host controller Tx Clock source selection in MII or RGMII mode. */
+		reg |= (1 << 8) | (1 << 29);    /* EMAC_TRX_CLK_CFG.emac_txclk_sel = 0   using the Reference Clock in RMII mode*/
+		reg |= (1 << 2) | (1 << 23);    /* Txdly 2ns */
+	}
+	else
+	{
+		dev_err(&pdev->dev, "parse phy mode error (%s).\n", phy_mode_str);
+		goto err_out_free_netdev;
+	}
+	writel(reg, addr);
+    iounmap(addr);
 
 	/* IP specific init */
 	err = init(pdev);
@@ -4001,6 +4058,8 @@ static int macb_probe(struct platform_device *pdev)
 	netdev_info(dev, "Cadence %s rev 0x%08x at 0x%08lx irq %d (%pM)\n",
 		    macb_is_gem(bp) ? "GEM" : "MACB", macb_readl(bp, MID),
 		    dev->base_addr, dev->irq, dev->dev_addr);
+	pm_runtime_enable(&pdev->dev);
+	pm_runtime_get(&pdev->dev);
 
 	return 0;
 
@@ -4050,7 +4109,8 @@ static int macb_remove(struct platform_device *pdev)
 		of_node_put(bp->phy_node);
 		free_netdev(dev);
 	}
-
+	pm_runtime_put(&pdev->dev);
+	pm_runtime_disable(&pdev->dev);
 	return 0;
 }
 

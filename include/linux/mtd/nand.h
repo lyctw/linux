@@ -19,6 +19,7 @@
  * @oobsize: OOB area size
  * @pages_per_eraseblock: number of pages per eraseblock
  * @eraseblocks_per_lun: number of eraseblocks per LUN (Logical Unit Number)
+ * @max_bad_eraseblocks_per_lun: maximum number of eraseblocks per LUN
  * @planes_per_lun: number of planes per LUN
  * @luns_per_target: number of LUN per target (target is a synonym for die)
  * @ntargets: total number of targets exposed by the NAND device
@@ -29,18 +30,20 @@ struct nand_memory_organization {
 	unsigned int oobsize;
 	unsigned int pages_per_eraseblock;
 	unsigned int eraseblocks_per_lun;
+        unsigned int max_bad_eraseblocks_per_lun;
 	unsigned int planes_per_lun;
 	unsigned int luns_per_target;
 	unsigned int ntargets;
 };
 
-#define NAND_MEMORG(bpc, ps, os, ppe, epl, ppl, lpt, nt)	\
+#define NAND_MEMORG(bpc, ps, os, ppe, epl, mbb, ppl, lpt, nt)	\
 	{							\
 		.bits_per_cell = (bpc),				\
 		.pagesize = (ps),				\
 		.oobsize = (os),				\
 		.pages_per_eraseblock = (ppe),			\
 		.eraseblocks_per_lun = (epl),			\
+                .max_bad_eraseblocks_per_lun = (mbb),           \
 		.planes_per_lun = (ppl),			\
 		.luns_per_target = (lpt),			\
 		.ntargets = (nt),				\
@@ -86,6 +89,7 @@ struct nand_pos {
  * @ooboffs: the OOB offset within the page
  * @ooblen: the number of OOB bytes to read from/write to this page
  * @oobbuf: buffer to store OOB data in or get OOB data from
+ * @mode: one of the %MTD_OPS_XXX mode
  *
  * This object is used to pass per-page I/O requests to NAND sub-layers. This
  * way all useful information are already formatted in a useful way and
@@ -106,6 +110,7 @@ struct nand_page_io_req {
 		const void *out;
 		void *in;
 	} oobbuf;
+        int mode;
 };
 
 /**
@@ -727,5 +732,7 @@ static inline bool nanddev_bbt_is_initialized(struct nand_device *nand)
 
 /* MTD -> NAND helper functions. */
 int nanddev_mtd_erase(struct mtd_info *mtd, struct erase_info *einfo);
+int nanddev_mtd_max_bad_blocks(struct mtd_info *mtd, loff_t offs, size_t len);
+
 
 #endif /* __LINUX_MTD_NAND_H */

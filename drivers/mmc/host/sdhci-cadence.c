@@ -20,7 +20,8 @@
 #include <linux/mmc/host.h>
 #include <linux/mmc/mmc.h>
 #include <linux/of.h>
-
+#include <linux/reset.h>
+#include <linux/pm_runtime.h>
 #include "sdhci-pltfm.h"
 
 /* HRS - Host Register Set (specific to Cadence) */
@@ -336,6 +337,25 @@ static int sdhci_cdns_probe(struct platform_device *pdev)
 	unsigned int nr_phy_params;
 	int ret;
 	struct device *dev = &pdev->dev;
+	struct reset_control *reset;
+
+	u32 *mailbox_base = ioremap(0x970E0000, 0x1000);
+	u32 *sd_protect = mailbox_base+(0x168/4);
+	*sd_protect = (0x7<<16);
+	pr_info("sd_protect:0x%x 0x%x 0x%x\n", mailbox_base, sd_protect, *(sd_protect));
+    iounmap(mailbox_base);
+	
+#ifdef CONFIG_CANAAN_PM_DOMAIN
+	pr_info("[K510_POWER]:sdhci_cdns_probe pm_runtime_enable!\r\n");
+	pm_runtime_enable(dev); /*enable pm runtime*/
+	pm_runtime_get(dev);    /*used count ++*/
+#endif
+
+#ifdef CONFIG_COMMON_RESET_K510
+	pr_info("[K510_RESET]:sdhci_cdns_probe reset!\r\n");
+	reset = devm_reset_control_get(&pdev->dev,NULL);
+	reset_control_reset(reset);
+#endif
 
 	clk = devm_clk_get(dev, NULL);
 	if (IS_ERR(clk))
@@ -344,6 +364,7 @@ static int sdhci_cdns_probe(struct platform_device *pdev)
 	ret = clk_prepare_enable(clk);
 	if (ret)
 		return ret;
+	pr_info("[K510_CLOCK]:sdhci_cdns_probe clock rate %d\n",(unsigned int)clk_get_rate(clk));
 
 	nr_phy_params = sdhci_cdns_phy_param_count(dev->of_node);
 	priv_size = sizeof(*priv) + sizeof(priv->phy_params[0]) * nr_phy_params;
@@ -430,6 +451,17 @@ static const struct of_device_id sdhci_cdns_match[] = {
 };
 MODULE_DEVICE_TABLE(of, sdhci_cdns_match);
 
+static int sdhci_cdns_detach(struct platform_device *pdev) {
+    sdhci_pltfm_unregister(pdev);
+
+#ifdef CONFIG_CANAAN_PM_DOMAIN
+    pm_runtime_put(&pdev->dev);        /*used count --*/
+    pm_runtime_disable(&pdev->dev);    /*disable pm runtime*/
+#endif
+
+	return 0;
+}
+
 static struct platform_driver sdhci_cdns_driver = {
 	.driver = {
 		.name = "sdhci-cdns",
@@ -437,7 +469,8 @@ static struct platform_driver sdhci_cdns_driver = {
 		.of_match_table = sdhci_cdns_match,
 	},
 	.probe = sdhci_cdns_probe,
-	.remove = sdhci_pltfm_unregister,
+	/*.remove = sdhci_pltfm_unregister,*/
+	.remove = sdhci_cdns_detach,
 };
 module_platform_driver(sdhci_cdns_driver);
 

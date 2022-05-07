@@ -47,6 +47,13 @@ config SPI_MASTER
 
 if SPI_MASTER
 
+config SPI_MEM
+	bool "SPI memory extension"
+	help
+	  Enable this option if you want to enable the SPI memory extension.
+	  This extension is meant to simplify interaction with SPI memories
+	  by providing an high-level interface to send memory-like commands.
+
 comment "SPI Master Controller Drivers"
 
 config SPI_ALTERA
@@ -201,6 +208,10 @@ config SPI_DESIGNWARE
 	tristate "DesignWare SPI controller core support"
 	help
 	  general driver for SPI controller core from DesignWare
+
+config SPI_DW_DMA
+	bool "DMA support for DW SPI controller"
+	depends on SPI_DESIGNWARE
 
 config SPI_DW_PCI
 	tristate "PCI interface driver for DW SPI core"
@@ -750,11 +761,6 @@ config SPI_SIFIVE
         help
           This exposes the SPI controller IP from SiFive.
 
-config SPI_ATCSPI200
-        tristate "ANDES TECH SPI controller"
-        depends on HAS_IOMEM
-        help
-          This exposes the SPI controller IP from Andes.
 #
 # Add new SPI master controllers in alphabetical order above this line
 #

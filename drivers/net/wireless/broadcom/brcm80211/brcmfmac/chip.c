@@ -19,6 +19,7 @@
 #include <linux/ssb/ssb_regs.h>
 #include <linux/bcma/bcma.h>
 #include <linux/bcma/bcma_regs.h>
+#include <linux/delay.h>
 
 #include <defs.h>
 #include <soc.h>
@@ -857,8 +858,19 @@ int brcmf_chip_dmp_erom_scan(struct brcmf_chip_priv *ci)
 	u8 nmp, nsp, nmw, nsw, rev;
 	u32 base, wrap;
 	int err;
-
-	eromaddr = ci->ops->read32(ci->ctx, CORE_CC_REG(SI_ENUM_BASE, eromptr));
+	int trynum = 5;
+	/*temporary plan for stability*/
+	while (trynum-- > 0)
+	{
+		eromaddr = ci->ops->read32(ci->ctx, CORE_CC_REG(SI_ENUM_BASE, eromptr));
+		if (eromaddr == 0x18108000)
+			break;
+		else
+		{
+			udelay(50);
+			continue;
+		}
+	}
 
 	while (desc_type != DMP_DESC_EOT) {
 		val = brcmf_chip_dmp_get_desc(ci, &eromaddr, &desc_type);
@@ -876,8 +888,13 @@ int brcmf_chip_dmp_erom_scan(struct brcmf_chip_priv *ci)
 
 		/* next descriptor must be component as well */
 		val = brcmf_chip_dmp_get_desc(ci, &eromaddr, &desc_type);
+		/*temporary plan for stability*/
+		/*
 		if (WARN_ON((val & DMP_DESC_TYPE_MSK) != DMP_DESC_COMPONENT))
 			return -EFAULT;
+		*/
+		if ((val & DMP_DESC_TYPE_MSK) != DMP_DESC_COMPONENT)
+			continue;
 
 		/* only look at cores with master port(s) */
 		nmp = (val & DMP_COMP_NUM_MPORT) >> DMP_COMP_NUM_MPORT_S;
@@ -913,21 +930,34 @@ static int brcmf_chip_recognition(struct brcmf_chip_priv *ci)
 	u32 regdata;
 	u32 socitype;
 	int ret;
+	int trynum = 5;
 
 	/* Get CC core rev
 	 * Chipid is assume to be at offset 0 from SI_ENUM_BASE
 	 * For different chiptypes or old sdio hosts w/o chipcommon,
 	 * other ways of recognition should be added here.
 	 */
-	regdata = ci->ops->read32(ci->ctx, CORE_CC_REG(SI_ENUM_BASE, chipid));
-	ci->pub.chip = regdata & CID_ID_MASK;
-	ci->pub.chiprev = (regdata & CID_REV_MASK) >> CID_REV_SHIFT;
-	socitype = (regdata & CID_TYPE_MASK) >> CID_TYPE_SHIFT;
+	/*temporary plan for stability*/
+	while (trynum-- > 0)
+	{
+		regdata = ci->ops->read32(ci->ctx, CORE_CC_REG(SI_ENUM_BASE, chipid));
+		ci->pub.chip = regdata & CID_ID_MASK;
+		ci->pub.chiprev = (regdata & CID_REV_MASK) >> CID_REV_SHIFT;
+		socitype = (regdata & CID_TYPE_MASK) >> CID_TYPE_SHIFT;
 
-	brcmf_chip_name(ci->pub.chip, ci->pub.chiprev,
-			ci->pub.name, sizeof(ci->pub.name));
-	brcmf_dbg(INFO, "found %s chip: %s\n",
-		  socitype == SOCI_SB ? "SB" : "AXI", ci->pub.name);
+		brcmf_chip_name(ci->pub.chip, ci->pub.chiprev,
+				ci->pub.name, sizeof(ci->pub.name));
+		brcmf_dbg(INFO, "found %s chip: %s\n",
+			socitype == SOCI_SB ? "SB" : "AXI", ci->pub.name);
+		
+		if (socitype == SOCI_AI)
+			break;
+		else if (socitype == SOCI_SB)
+		{
+			udelay(50);
+			continue;
+		}
+	}
 
 	if (socitype == SOCI_SB) {
 		if (ci->pub.chip != BRCM_CC_4329_CHIP_ID) {

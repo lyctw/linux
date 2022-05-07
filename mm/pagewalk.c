@@ -1,9 +1,64 @@
 // SPDX-License-Identifier: GPL-2.0
-#include <linux/mm.h>
+#include <linux/pagewalk.h>
 #include <linux/highmem.h>
 #include <linux/sched.h>
 #include <linux/hugetlb.h>
 
+/*
+ * We want to know the real level where a entry is located ignoring any
+ * folding of levels which may be happening. For example if p4d is folded then
+ * a missing entry found at level 1 (p4d) is actually at level 0 (pgd).
+ */
+static int real_depth(int depth)
+{
+        if (depth == 3 && PTRS_PER_PMD == 1)
+                depth = 2;
+        if (depth == 2 && PTRS_PER_PUD == 1)
+                depth = 1;
+        if (depth == 1 && PTRS_PER_P4D == 1)
+                depth = 0;
+        return depth;
+}
+
+static int walk_pte_range_inner(pte_t *pte, unsigned long addr,
+                                unsigned long end, struct mm_walk *walk)
+{
+//        const struct mm_walk_ops *ops = walk->ops;
+        int err = 0;
+
+        for (;;) {
+                err = walk->pte_entry(pte, addr, addr + PAGE_SIZE, walk);
+                if (err)
+                       break;
+                if (addr >= end - PAGE_SIZE)
+                        break;
+                addr += PAGE_SIZE;
+                pte++;
+        }
+        return err;
+}
+
+static int walk_pte_range(pmd_t *pmd, unsigned long addr, unsigned long end,
+                          struct mm_walk *walk)
+{
+        pte_t *pte;
+        int err = 0;
+        spinlock_t *ptl;
+
+        if (walk->no_vma) {
+                pte = pte_offset_map(pmd, addr);
+                err = walk_pte_range_inner(pte, addr, end, walk);
+                pte_unmap(pte);
+        } else {
+                pte = pte_offset_map_lock(walk->mm, pmd, addr, &ptl);
+                err = walk_pte_range_inner(pte, addr, end, walk);
+                pte_unmap_unlock(pte, ptl);
+        }
+
+        return err;
+}
+
+#if 0
 static int walk_pte_range(pmd_t *pmd, unsigned long addr, unsigned long end,
 			  struct mm_walk *walk)
 {
@@ -25,24 +80,30 @@ static int walk_pte_range(pmd_t *pmd, unsigned long addr, unsigned long end,
 	return err;
 }
 
+#endif
+
 static int walk_pmd_range(pud_t *pud, unsigned long addr, unsigned long end,
 			  struct mm_walk *walk)
 {
 	pmd_t *pmd;
 	unsigned long next;
 	int err = 0;
+	int depth = real_depth(3);
 
 	pmd = pmd_offset(pud, addr);
 	do {
 again:
 		next = pmd_addr_end(addr, end);
-		if (pmd_none(*pmd) || !walk->vma) {
+		if (pmd_none(*pmd) || (!walk->vma && !walk->no_vma)) {
 			if (walk->pte_hole)
-				err = walk->pte_hole(addr, next, walk);
+				err = walk->pte_hole(addr, next, depth, walk);
 			if (err)
 				break;
 			continue;
 		}
+
+		walk->action = ACTION_SUBTREE;
+
 		/*
 		 * This implies that each ->pmd_entry() handler
 		 * needs to know about pmd_trans_huge() pmds
@@ -52,16 +113,24 @@ again:
 		if (err)
 			break;
 
+                if (walk->action == ACTION_AGAIN)
+                        goto again;
+
 		/*
 		 * Check this here so we only break down trans_huge
 		 * pages when we _need_ to
 		 */
-		if (!walk->pte_entry)
+		if ((!walk->vma && (pmd_leaf(*pmd) || !pmd_present(*pmd))) ||
+                    walk->action == ACTION_CONTINUE ||
+		    !(walk->pte_entry))
 			continue;
 
-		split_huge_pmd(walk->vma, pmd, addr);
-		if (pmd_trans_unstable(pmd))
-			goto again;
+		if (walk->vma) {
+			split_huge_pmd(walk->vma, pmd, addr);
+			if (pmd_trans_unstable(pmd))
+				goto again;
+		}
+
 		err = walk_pte_range(pmd, addr, next, walk);
 		if (err)
 			break;
@@ -76,37 +145,42 @@ static int walk_pud_range(p4d_t *p4d, unsigned long addr, unsigned long end,
 	pud_t *pud;
 	unsigned long next;
 	int err = 0;
+	int depth = real_depth(2);
 
 	pud = pud_offset(p4d, addr);
 	do {
  again:
 		next = pud_addr_end(addr, end);
-		if (pud_none(*pud) || !walk->vma) {
+		if (pud_none(*pud) || (!walk->vma && !walk->no_vma)) {
 			if (walk->pte_hole)
-				err = walk->pte_hole(addr, next, walk);
+				err = walk->pte_hole(addr, next, depth, walk);
 			if (err)
 				break;
 			continue;
 		}
 
-		if (walk->pud_entry) {
-			spinlock_t *ptl = pud_trans_huge_lock(pud, walk->vma);
+		walk->action = ACTION_SUBTREE;
 
-			if (ptl) {
-				err = walk->pud_entry(pud, addr, next, walk);
-				spin_unlock(ptl);
-				if (err)
-					break;
-				continue;
-			}
-		}
+                if (walk->pud_entry)
+                        err = walk->pud_entry(pud, addr, next, walk);
+                if (err)
+                        break;
 
-		split_huge_pud(walk->vma, pud, addr);
+                if (walk->action == ACTION_AGAIN)
+                        goto again;
+
+                if ((!walk->vma && (pud_leaf(*pud) || !pud_present(*pud))) ||
+                    walk->action == ACTION_CONTINUE ||
+                    !(walk->pmd_entry || walk->pte_entry))
+                        continue;
+
+		if (walk->vma)
+			split_huge_pud(walk->vma, pud, addr);
+
 		if (pud_none(*pud))
 			goto again;
 
-		if (walk->pmd_entry || walk->pte_entry)
-			err = walk_pmd_range(pud, addr, next, walk);
+		err = walk_pmd_range(pud, addr, next, walk);
 		if (err)
 			break;
 	} while (pud++, addr = next, addr != end);
@@ -120,18 +194,24 @@ static int walk_p4d_range(pgd_t *pgd, unsigned long addr, unsigned long end,
 	p4d_t *p4d;
 	unsigned long next;
 	int err = 0;
+	int depth = real_depth(1);
 
 	p4d = p4d_offset(pgd, addr);
 	do {
 		next = p4d_addr_end(addr, end);
 		if (p4d_none_or_clear_bad(p4d)) {
 			if (walk->pte_hole)
-				err = walk->pte_hole(addr, next, walk);
+				err = walk->pte_hole(addr, next, depth, walk);
 			if (err)
 				break;
 			continue;
 		}
-		if (walk->pmd_entry || walk->pte_entry)
+                if (walk->p4d_entry) {
+                        err = walk->p4d_entry(p4d, addr, next, walk);
+                        if (err)
+                                break;
+                }
+		if (walk->pud_entry || walk->pmd_entry || walk->pte_entry)
 			err = walk_pud_range(p4d, addr, next, walk);
 		if (err)
 			break;
@@ -147,17 +227,26 @@ static int walk_pgd_range(unsigned long addr, unsigned long end,
 	unsigned long next;
 	int err = 0;
 
-	pgd = pgd_offset(walk->mm, addr);
+        if (walk->pgd)
+                pgd = walk->pgd + pgd_index(addr);
+        else
+                pgd = pgd_offset(walk->mm, addr);
 	do {
 		next = pgd_addr_end(addr, end);
 		if (pgd_none_or_clear_bad(pgd)) {
 			if (walk->pte_hole)
-				err = walk->pte_hole(addr, next, walk);
+				err = walk->pte_hole(addr, next, 0, walk);
 			if (err)
 				break;
 			continue;
 		}
-		if (walk->pmd_entry || walk->pte_entry)
+                if (walk->pgd_entry) {
+                        err = walk->pgd_entry(pgd, addr, next, walk);
+                        if (err)
+                                break;
+                }
+		if (walk->p4d_entry || walk->pud_entry || walk->pmd_entry || 
+		    walk->pte_entry)
 			err = walk_p4d_range(pgd, addr, next, walk);
 		if (err)
 			break;
@@ -192,7 +281,7 @@ static int walk_hugetlb_range(unsigned long addr, unsigned long end,
 		if (pte)
 			err = walk->hugetlb_entry(pte, hmask, addr, next, walk);
 		else if (walk->pte_hole)
-			err = walk->pte_hole(addr, next, walk);
+			err = walk->pte_hole(addr, next, -1, walk);
 
 		if (err)
 			break;
@@ -235,7 +324,7 @@ static int walk_page_test(unsigned long start, unsigned long end,
 	if (vma->vm_flags & VM_PFNMAP) {
 		int err = 1;
 		if (walk->pte_hole)
-			err = walk->pte_hole(start, end, walk);
+			err = walk->pte_hole(start, end, -1, walk);
 		return err ? err : 1;
 	}
 	return 0;
@@ -337,6 +426,28 @@ int walk_page_range(unsigned long start, unsigned long end,
 			break;
 	} while (start = next, start < end);
 	return err;
+}
+
+int walk_page_range_novma(unsigned long start, unsigned long end, 
+			struct mm_walk *walk)
+{
+#if 0
+        struct mm_walk walk = {
+                .ops            = ops,
+                .mm             = mm,
+                .pgd            = pgd,
+                .private        = private,
+                .no_vma         = true
+        };
+#endif
+
+        if (start >= end || !walk->mm)
+                return -EINVAL;
+
+//        mmap_assert_locked(walk->mm);
+	lockdep_assert_held(walk->mm->mmap_sem);
+
+        return __walk_page_range(start, end, walk);
 }
 
 int walk_page_vma(struct vm_area_struct *vma, struct mm_walk *walk)

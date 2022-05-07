@@ -136,6 +136,16 @@ static void dw_wdt_arm_system_reset(struct dw_wdt *dw_wdt)
 	writel(val, dw_wdt->regs + WDOG_CONTROL_REG_OFFSET);
 }
 
+static void dw_wdt_disable(struct dw_wdt *dw_wdt)
+{
+	if (dw_wdt_is_enabled(dw_wdt)) {
+		writel(WDOG_COUNTER_RESTART_KICK_VALUE, dw_wdt->regs +
+			WDOG_COUNTER_RESTART_REG_OFFSET);
+	}
+
+	writel(0, dw_wdt->regs + WDOG_CONTROL_REG_OFFSET);
+}
+
 static int dw_wdt_start(struct watchdog_device *wdd)
 {
 	struct dw_wdt *dw_wdt = to_dw_wdt(wdd);
@@ -155,6 +165,7 @@ static int dw_wdt_stop(struct watchdog_device *wdd)
 		return 0;
 	}
 
+	dw_wdt_disable(dw_wdt);
 	reset_control_assert(dw_wdt->rst);
 	reset_control_deassert(dw_wdt->rst);
 

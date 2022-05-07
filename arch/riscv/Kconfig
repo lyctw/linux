@@ -17,6 +17,7 @@ config RISCV
 	select OF_EARLY_FLATTREE
 	select OF_IRQ
 	select ARCH_WANT_FRAME_POINTERS
+	select GENERIC_PTDUMP if MMU
 	select ARCH_SUPPORTS_INT128
 	select CLONE_BACKWARDS
 	select COMMON_CLK
@@ -49,10 +50,8 @@ config RISCV
 	select RISCV_TIMER
 	select GENERIC_IRQ_MULTI_HANDLER
 	select MODULE_SECTIONS if MODULES
-	select GENERIC_STRNCPY_FROM_USER if KASAN
-	select HAVE_ARCH_KASAN if MMU
 	select SWIOTLB
-
+	select OF_RESERVED_MEM
 config CPU_FREQ
 	def_bool y
 
@@ -149,6 +148,7 @@ config ARCH_RV64I
 	select HAVE_FTRACE_MCOUNT_RECORD
 	select HAVE_DYNAMIC_FTRACE
 	select HAVE_DYNAMIC_FTRACE_WITH_REGS
+	select ARCH_USES_HIGH_VMA_FLAGS
 
 endchoice
 
@@ -256,31 +256,6 @@ config FPU
 	  Say N here if you want to disable all floating-point related procedure
 	  in the kernel.
 	  If you don't know what to do here, say Y.
-
-config HIGHMEM
-    bool "High Memory Support"
-	default n
-    help
-      The address space of Andes A25MP processors is only 4 Gigabytes large
-      and it has to accommodate user address space, kernel address
-      space as well as some memory mapped IO. That means that, if you
-      have a large amount of physical memory and/or IO, not all of the
-      memory can be "permanently mapped" by the kernel. The physical
-      memory that is not permanently mapped is called "high memory".
-
-      Depending on the selected kernel/user memory split, minimum
-      vmalloc space and actual amount of RAM, you may not need this
-      option which should result in a slightly faster kernel.
-
-      If unsure, say n.
-
-config PMA
-	bool "PMA support"
-	default y
-	help
-	  Since 27 series we have PMA support to control non-cacheable
-	  region.  It is transparent to user.  If you want to reduce
-	  marginal code size, say N.
 
 endmenu
 

@@ -1,0 +1,149 @@
+/* Copyright (c) 2022, Canaan Bright Sight Co., Ltd
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+*/
+
+/* soc power domain provider , please see k510_pm_domains.c
+    1. please see power_provider.dtsi and k510_pm_domains.c for provider. 
+       power domain exclude ax25m, because it cannot be opened when ax25m power down
+    2. power_consumer.dtsi define device's power-domains. 
+       drivers call pm_runtime_get(&dev) to enable powerdomain (use_count++),
+       and call pm_runtime_put(&dev) to disable powerdomain(if use_count-- == 0).
+       power domain is for runtime power manage.
+    3. for debug info, please cat /sys/kernel/debug/pm_genpd(mount -t debugfs none /sys/kernel/debug).
+*/
+
+#include <dt-bindings/soc/canaan,k510_pm_domains.h>
+
+&mctl {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_MCTL>;
+};
+
+&sram0 {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_SRAM0>;
+};
+
+&sram1 {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_SRAM1>;
+};
+
+&gnne {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_GNNE>;
+};
+
+&dsp {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_AX25P>;
+};
+
+/* security */
+&aes {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_SEC>;
+};
+&sha {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_SEC>;
+};
+&trng {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_SEC>;
+};
+&rom {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_SEC>;
+};
+&otp {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_SEC>;
+};
+
+/* storage */
+&sdios {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_STOR>;
+};
+&sdio0 {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_STOR>;
+};
+&sdio1 {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_STOR>;
+};
+&sdio2 {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_STOR>;
+};
+&emac {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_STOR>;
+};
+&pdma {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_STOR>;
+};
+&sdma {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_STOR>;
+};
+
+/* peri */
+&spi0 {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_PERI>;
+};
+&spi1 {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_PERI>;
+};
+&spi2 {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_PERI>;
+};
+&spis {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_PERI>;
+};
+
+&gpio {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_PERI>;
+};
+/*
+&i2c0 {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_PERI>;
+};
+&i2c1 {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_PERI>;
+};
+&i2c2 {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_PERI>;
+};
+&i2c3 {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_PERI>;
+};
+*/
+&serial0 {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_PERI>;
+};
+&serial1 {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_PERI>;
+};
+&serial2 {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_PERI>;
+};
+&serial3 {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_PERI>;
+};
+&i2ss {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_PERI>;
+};
+
+&audio {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_PERI>;
+};
+
+&usb {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_USB>;
+};
+
+&isp {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_ISP>;
+};
+
+&isp1 {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_ISP>;
+};
+
+&h264 {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_H264>;
+};
+
+&display {
+    power-domains = <&sysctl_power K510_PM_DOMAIN_DISP>;
+};

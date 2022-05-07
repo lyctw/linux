@@ -17,7 +17,7 @@
  * Refer to include/linux/hmm.h for information about heterogeneous memory
  * management or HMM for short.
  */
-#include <linux/mm.h>
+#include <linux/pagewalk.h>
 #include <linux/hmm.h>
 #include <linux/init.h>
 #include <linux/rmap.h>
@@ -431,7 +431,7 @@ static void hmm_range_need_fault(const struct hmm_vma_walk *hmm_vma_walk,
 }
 
 static int hmm_vma_walk_hole(unsigned long addr, unsigned long end,
-			     struct mm_walk *walk)
+			     __always_unused int depth, struct mm_walk *walk)
 {
 	struct hmm_vma_walk *hmm_vma_walk = walk->private;
 	struct hmm_range *range = hmm_vma_walk->range;
@@ -585,7 +585,7 @@ static int hmm_vma_walk_pmd(pmd_t *pmdp,
 
 again:
 	if (pmd_none(*pmdp))
-		return hmm_vma_walk_hole(start, end, walk);
+		return hmm_vma_walk_hole(start, end, -1, walk);
 
 	if (pmd_huge(*pmdp) && (range->vma->vm_flags & VM_HUGETLB))
 		return hmm_pfns_bad(start, end, walk);

@@ -30,9 +30,9 @@ obj-y	+= riscv_ksyms.o
 obj-y	+= stacktrace.o
 obj-y	+= vdso.o
 obj-y	+= cacheinfo.o
+obj-y	+= plmt.o
 obj-y	+= vdso/
 
-KASAN_SANITIZE_setup.o := n
 CFLAGS_setup.o := -mcmodel=medany
 
 obj-$(CONFIG_FPU)		+= fpu.o

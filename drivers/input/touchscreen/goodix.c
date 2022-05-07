@@ -54,6 +54,7 @@ struct goodix_ts_data {
 	const char *cfg_name;
 	struct completion firmware_loading_complete;
 	unsigned long irq_flags;
+	unsigned char cfg_data[512];
 };
 
 #define GOODIX_GPIO_INT_NAME		"irq"
@@ -84,6 +85,8 @@ struct goodix_ts_data {
 #define RESOLUTION_LOC		1
 #define MAX_CONTACTS_LOC	5
 #define TRIGGER_LOC		6
+
+#define _CONFIG_DATA_FROM_DTB
 
 static int goodix_check_cfg_8(struct goodix_ts_data *ts,
 			const struct firmware *cfg);
@@ -438,18 +441,29 @@ static int goodix_send_cfg(struct goodix_ts_data *ts,
 			   const struct firmware *cfg)
 {
 	int error;
+	int try = 3;
 
 	error = goodix_check_cfg(ts, cfg);
 	if (error)
 		return error;
 
-	error = goodix_i2c_write(ts->client, ts->chip->config_addr, cfg->data,
-				 cfg->size);
-	if (error) {
-		dev_err(&ts->client->dev, "Failed to write config data: %d",
-			error);
-		return error;
+	while (try--)
+	{
+		error = goodix_i2c_write(ts->client, ts->chip->config_addr, cfg->data,
+					cfg->size);
+		if (error) {
+			dev_err(&ts->client->dev, "Failed to write config data: %d",
+				error);
+			usleep_range(5000, 8000);
+			continue;
+		}
+		else
+			break;
 	}
+
+	if (error)
+		return error;
+	else
 	dev_dbg(&ts->client->dev, "Config sent successfully.");
 
 	/* Let the firmware reconfigure itself, so sleep for 10ms */
@@ -570,7 +584,6 @@ static void goodix_read_config(struct goodix_ts_data *ts)
 	u8 config[GOODIX_CONFIG_MAX_LENGTH];
 	int x_max, y_max;
 	int error;
-
 	error = goodix_i2c_read(ts->client, ts->chip->config_addr,
 				config, ts->chip->config_len);
 	if (error) {
@@ -757,7 +770,9 @@ static void goodix_config_cb(const struct firmware *cfg, void *ctx)
 	goodix_configure_dev(ts);
 
 err_release_cfg:
+#ifndef _CONFIG_DATA_FROM_DTB
 	release_firmware(cfg);
+#endif
 	complete_all(&ts->firmware_loading_complete);
 }
 
@@ -766,6 +781,7 @@ static int goodix_ts_probe(struct i2c_client *client,
 {
 	struct goodix_ts_data *ts;
 	int error;
+	struct firmware cfg;
 
 	dev_dbg(&client->dev, "I2C Address: 0x%02x\n", client->addr);
 
@@ -811,6 +827,17 @@ static int goodix_ts_probe(struct i2c_client *client,
 
 	if (ts->gpiod_int && ts->gpiod_rst) {
 		/* update device config */
+#ifdef _CONFIG_DATA_FROM_DTB
+		memset(ts->cfg_data, 0x00, ts->chip->config_len);
+		of_property_read_u8_array(client->dev.of_node, "goodix,cfg-group0", ts->cfg_data, ts->chip->config_len);
+		cfg.size = ts->chip->config_len;
+		cfg.data = ts->cfg_data;
+
+		goodix_config_cb(&cfg, ts);
+		udelay(100);
+		if (goodix_i2c_write_u8(ts->client, GOODIX_READ_COOR_ADDR, 0) < 0)
+			dev_err(&ts->client->dev, "I2C write end_cmd error\n");
+#else
 		ts->cfg_name = devm_kasprintf(&client->dev, GFP_KERNEL,
 					      "goodix_%d_cfg.bin", ts->id);
 		if (!ts->cfg_name)
@@ -825,7 +852,7 @@ static int goodix_ts_probe(struct i2c_client *client,
 				error);
 			return error;
 		}
-
+#endif
 		return 0;
 	} else {
 		error = goodix_configure_dev(ts);

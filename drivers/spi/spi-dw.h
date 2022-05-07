@@ -6,6 +6,16 @@
 #include <linux/scatterlist.h>
 #include <linux/gpio.h>
 
+#include <linux/stddef.h>
+
+//#include <linux/bits.h>
+#include <linux/completion.h>
+#include <linux/debugfs.h>
+#include <linux/irqreturn.h>
+#include <linux/scatterlist.h>
+#include <linux/spi/spi-mem.h>
+#include <linux/bitfield.h>
+
 /* Register offsets */
 #define DW_SPI_CTRL0			0x00
 #define DW_SPI_CTRL1			0x04
@@ -32,11 +42,15 @@
 #define DW_SPI_IDR			0x58
 #define DW_SPI_VERSION			0x5c
 #define DW_SPI_DR			0x60
+#define DW_SPI_RX_SAMPLE_DLY		0xf0
+#define DW_SPI_SPI_CTRLR0	0xf4
 
 /* Bit fields in CTRLR0 */
 #define SPI_DFS_OFFSET			0
 
 #define SPI_FRF_OFFSET			4
+//yangguang
+//#define SPI_FRF_OFFSET			6
 #define SPI_FRF_SPI			0x0
 #define SPI_FRF_SSP			0x1
 #define SPI_FRF_MICROWIRE		0x2
@@ -45,8 +59,14 @@
 #define SPI_MODE_OFFSET			6
 #define SPI_SCPH_OFFSET			6
 #define SPI_SCOL_OFFSET			7
+//yangguang
+//#define SPI_MODE_OFFSET			8
+//#define SPI_SCPH_OFFSET			8
+//#define SPI_SCOL_OFFSET			9
 
 #define SPI_TMOD_OFFSET			8
+//yangguang
+//#define SPI_TMOD_OFFSET			10
 #define SPI_TMOD_MASK			(0x3 << SPI_TMOD_OFFSET)
 #define	SPI_TMOD_TR			0x0		/* xmit & recv */
 #define SPI_TMOD_TO			0x1		/* xmit only */
@@ -56,6 +76,43 @@
 #define SPI_SLVOE_OFFSET		10
 #define SPI_SRL_OFFSET			11
 #define SPI_CFS_OFFSET			12
+//yangguang
+//#define SPI_SLVOE_OFFSET		12
+//#define SPI_SRL_OFFSET			13
+//#define SPI_CFS_OFFSET			16
+
+//yangguang: add dwc_ssi support
+/* Bit fields in CTRLR0 based on DWC_ssi_databook.pdf v1.01a */
+#define DWC_SSI_CTRLR0_SPI_FRF_OFFSET      	22
+#define DWC_SSI_CTRLR0_SPI_FRF_MASK      	GENMASK(23, 22)
+#define DWC_SSI_CTRLR0_SRL_OFFSET      13
+#define DWC_SSI_CTRLR0_TMOD_OFFSET     10
+#define DWC_SSI_CTRLR0_TMOD_MASK       GENMASK(11, 10)
+#define DWC_SSI_CTRLR0_SCPOL_OFFSET    9
+#define DWC_SSI_CTRLR0_SCPH_OFFSET     8
+#define DWC_SSI_CTRLR0_FRF_OFFSET      6
+#define DWC_SSI_CTRLR0_DFS_MASK      GENMASK(4, 0)
+#define DWC_SSI_CTRLR0_DFS_OFFSET      0
+
+#define DWC_SSI_RXDLY_SE_MASK      GENMASK(16, 16)
+#define DWC_SSI_RXDLY_SE_OFFSET      16
+#define DWC_SSI_RXDLY_RSD_MASK      GENMASK(7, 0)
+#define DWC_SSI_RXDLY_RSD_OFFSET      0
+
+#define DWC_SSI_SPI_CTRLR0_CLK_STRETCH_EN_OFFSET      	30
+#define DWC_SSI_SPI_CTRLR0_CLK_STRETCH_EN_MASK      	GENMASK(30, 30)
+#define DWC_SSI_SPI_CTRLR0_WAIT_CYCLES_OFFSET      	11
+#define DWC_SSI_SPI_CTRLR0_WAIT_CYCLES_MASK      	GENMASK(15, 11)
+#define DWC_SSI_SPI_CTRLR0_INST_L_OFFSET      	8
+#define DWC_SSI_SPI_CTRLR0_INST_L_MASK      	GENMASK(9, 8)
+#define DWC_SSI_SPI_CTRLR0_ADDR_L_OFFSET      	2
+#define DWC_SSI_SPI_CTRLR0_ADDR_L_MASK      	GENMASK(5, 2)
+#define DWC_SSI_SPI_CTRLR0_TRANS_TYPE_OFFSET      	0
+#define DWC_SSI_SPI_CTRLR0_TRANS_TYPE_MASK      	GENMASK(1, 0)
+
+/* Bit fields in CTRLR1 */
+#define SPI_NDF_MASK			GENMASK(15, 0)
+
 
 /* Bit fields in SR, 7 bits */
 #define SR_MASK				0x7f		/* cover 7 bits */
@@ -79,6 +136,14 @@
 #define SPI_DMA_RDMAE			(1 << 0)
 #define SPI_DMA_TDMAE			(1 << 1)
 
+#define SPI_WAIT_RETRIES		5
+
+#define SPI_BUF_SIZE \
+	(sizeof_field(struct spi_mem_op, cmd.opcode) + \
+	 sizeof_field(struct spi_mem_op, addr.val) + 256)
+#define SPI_GET_BYTE(_val, _idx) \
+	((_val) >> (BITS_PER_BYTE * (_idx)) & 0xff)
+
 /* TX RX interrupt level threshold, max can be 256 */
 #define SPI_INT_THRESHOLD		32
 
@@ -88,9 +153,17 @@ enum dw_ssi_type {
 	SSI_NS_MICROWIRE,
 };
 
+/* Slave spi_transfer/spi_mem_op related */
+struct dw_spi_cfg {
+	u8 tmode;
+	u8 dfs;
+	u32 ndf;
+	u32 freq;
+};
+
 struct dw_spi;
 struct dw_spi_dma_ops {
-	int (*dma_init)(struct dw_spi *dws);
+	int (*dma_init)(struct device *dev, struct dw_spi *dws);
 	void (*dma_exit)(struct dw_spi *dws);
 	int (*dma_setup)(struct dw_spi *dws, struct spi_transfer *xfer);
 	bool (*can_dma)(struct spi_controller *master, struct spi_device *spi,
@@ -112,18 +185,23 @@ struct dw_spi {
 	u32			reg_io_width;	/* DR I/O width in bytes */
 	u16			bus_num;
 	u16			num_cs;		/* supported slave numbers */
+//yangguang: add dwc_ssi support
+        u32 (*update_cr0)(struct spi_controller *master, struct spi_device *spi,
+                          struct spi_transfer *transfer);
+
 
 	/* Current message transfer state info */
 	size_t			len;
 	void			*tx;
-	void			*tx_end;
+	unsigned int	tx_len;
 	void			*rx;
-	void			*rx_end;
-	int			dma_mapped;
-	u8			n_bytes;	/* current is a 1/2 bytes op */
-	u32			dma_width;
+	unsigned int	rx_len;
+	int				dma_mapped;
+	u8				n_bytes;	/* current is a 1/2 bytes op */
+	u32				dma_width;
 	irqreturn_t		(*transfer_handler)(struct dw_spi *dws);
-	u32			current_freq;	/* frequency in hz */
+	u32				current_freq;	/* frequency in hz */
+	u32				cur_rx_sample_dly;
 
 	/* DMA info */
 	int			dma_inited;
@@ -132,8 +210,13 @@ struct dw_spi {
 	unsigned long		dma_chan_busy;
 	dma_addr_t		dma_addr; /* phy address of the Data register */
 	const struct dw_spi_dma_ops *dma_ops;
+	struct completion			dma_completion;
 	void			*dma_tx;
 	void			*dma_rx;
+
+	u32				txburst;
+	u32				rxburst;
+	u32				dma_sg_burst;
 
 	/* Bus interface info */
 	void			*priv;
@@ -248,7 +331,18 @@ extern int dw_spi_add_host(struct device *dev, struct dw_spi *dws);
 extern void dw_spi_remove_host(struct dw_spi *dws);
 extern int dw_spi_suspend_host(struct dw_spi *dws);
 extern int dw_spi_resume_host(struct dw_spi *dws);
+//yangguang: add dwc_ssi support
+extern u32 dw_spi_update_cr0(struct spi_controller *master,
+                            struct spi_device *spi,
+                            struct spi_transfer *transfer);
+extern u32 dw_spi_update_cr0_v1_01a(struct spi_controller *master,
+                                   struct spi_device *spi,
+                                   struct spi_transfer *transfer);
+
+
 
 /* platform related setup */
 extern int dw_spi_mid_init(struct dw_spi *dws); /* Intel MID platforms */
+
+void dw_spi_dma_setup_generic(struct dw_spi *dws);
 #endif /* DW_SPI_HEADER_H */

@@ -612,8 +612,6 @@ static inline int snd_ftssp_dma_ch_alloc(struct snd_pcm_substream *substream)
 		}
 		else
 #endif
-			/*TX DST handshake mode addr0 --> addr1
-			 * tx_dir == 0, addr1 set handshake ID*/
 			ch_req->ahb_req.dev_reqn = DMAC_REQN_I2SAC97TX;
 	} else {
 		ch_req = &dma_chreq_rx;
@@ -626,9 +624,7 @@ static inline int snd_ftssp_dma_ch_alloc(struct snd_pcm_substream *substream)
 		}
 		else
 #endif
-			/*RX SRC handshake mode, addr1 --> addr0
-			 *tx_dir == 1, addr1 set handshake ID*/
-			ch_req->ahb_req.dev_reqn  = DMAC_REQN_I2SAC97RX;
+			ch_req->ahb_req.dev_reqn = DMAC_REQN_I2SAC97RX;
 	}
 
 	ch_req->controller           = DMAD_DMAC_AHB_CORE;

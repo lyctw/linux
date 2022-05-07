@@ -1,0 +1,72 @@
+* Kendryte K510 System DMA Controller
+
+Required properties:
+- compatible: "Canaan,k510-sysdma"
+- reg: Address range of the DMAC registers. Should contain the registers base address and length
+- clocks: Should contain a reference to the parent clock
+- interrupt-parent: Should be the phandle for the interrupt controller
+- interrupts: 
+- dma-channels: Number of DMA channels supported by the controller. The maximum value is 4.
+
+Example:
+
+    sysdma: dma-controller@93050000 {
+        compatible = "Canaan,k510-sysdma";
+        reg = <0x0 0x93050000 0x0 0x10000>;
+        clocks = <&refclk>;
+        interrupt-parent = <&plic0>;
+        interrupts = <30 4>;
+        dma-channels = <4>;
+    };
+
+* Kendryte K510 Peripherals DMA Controller
+
+Required properties:
+- compatible: "Canaan,k510-peridma"
+- reg: Address range of the DMAC registers. Should contain the registers base address and length 
+- dma-cells: Should be 4. For more details, please refer to the DMA client binding below
+- clocks: Should contain a reference to the parent clock   
+- interrupt-parent: Should be the phandle for the interrupt controller 
+- interrupts: 
+- dma-channels: Number of DMA channels supported by the controller. The maximum value is 16
+- dma-requests: Number of DMA request signals supported by the controller
+
+Example:
+	
+    peridma: dma-controller@93040000 {
+        compatible = "Canaan,k510-peridma";
+        reg = <0x0 0x93040000 0x0 0x10000>;
+        #dma-cells = <4>;
+        clocks = <&refclk>;
+        interrupt-parent = <&plic0>;
+        interrupts = <31 4>;
+        dma-channels = <16>;
+        dma-requests = <35>;
+    };
+
+* Clients
+
+DMA clients connected to the Kendryte Peripherals DMA controller must use the format described in
+the dma.txt file, using a five-cell specifier for each channel.
+The five cells in order are:
+
+1. A phandle pointing to the DMA controller
+2. The priority of the dma channel. The valid value can be 1 to 15.
+3. Channel response waiting timeout time.
+4. Data endian configuration. 
+   0x0: Default configuration without any adjustment 
+   0x1: The transmission length is two bytes, and endian conversions are performed.
+   0x2: The transmission length is four bytes, and endian conversions are performed.  
+   0x3: The transmission length is eight bytes, and endian conversions are performed.  
+5. Choose peripherals.
+
+Example:
+
+	sha256: sha256-controller@91010000 {
+        compatible = "kendryte,k510-sha256";
+        reg = <0x0 0x91010000 0x0 0x10000>;
+        clocks = <&refclk>;
+        status = "okay";
+        dmas = <&peridma 1 0xfff 0 0x20>;
+        dma-names = "tx";
+    };

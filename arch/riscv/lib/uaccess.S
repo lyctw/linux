@@ -14,42 +14,81 @@ _epc:
 	.endm
 
 ENTRY(__copy_user)
-
+	/*local irq save*/
+	csrrci t3, sstatus, SR_SIE
 	/* Enable access to user memory */
 	li t6, SR_SUM
 	csrs sstatus, t6
 
-	beqz a2, exit			/* if n is zero just exit */
-	srli t0, a2, LGREG   	/* t0: number of word to copy */
-	andi t1, a2, SZREG -1	/* t1: bytes less than a word to copy */
-	beqz t0, byte_copy		/* Only less than a word to byte copy */
+	add a3, a1, a2
+	/* Use word-oriented copy only if low-order bits match */
+	andi t0, a0, SZREG-1
+	andi t1, a1, SZREG-1
+//	bne t0, t1, 6f
+	bne t0, t1, 2f
 
-word_copy:
+	addi t0, a1, SZREG-1
+	andi t1, a3, ~(SZREG-1)
+	andi t0, t0, ~(SZREG-1)
+	/*
+	 * a3: terminal address of source region
+	 * t0: lowest XLEN-aligned address in source
+	 * t1: highest XLEN-aligned address in source
+	 */
+	bgeu t0, t1, 2f
+	bltu a1, t0, 4f
+1:
 	fixup REG_L, t2, (a1), 10f
 	fixup REG_S, t2, (a0), 10f
 	addi a1, a1, SZREG
 	addi a0, a0, SZREG
-	addi t0, t0, -1			/* Decrease word count */
-	bnez t0, word_copy		/* Continue looping to copy all words */
-	beqz t1, exit			/* Done word copy and no left bytes to copy */
+	bltu a1, t1, 1b
+2:
+	bltu a1, a3, 5f
 
-byte_copy:
-	fixup lbu, t2, (a1), 10f
-	fixup  sb, t2, (a0), 10f
-	addi a1, a1, 1
-	addi a0, a0, 1
-	addi t1, t1, -1			/* Decrease byte count */
-	bnez t1, byte_copy		/* Contine looping to clear all left bytes */
-
-exit:
+3:
 	/* Disable access to user memory */
 	csrc sstatus, t6
+	
+	/*local irq restore*/
+	andi t3, t3, SR_SIE
+	csrs sstatus, t3
 	li a0, 0
 	ret
+4: /* Edge case: unalignment */
+	fixup lbu, t2, (a1), 10f
+	fixup sb, t2, (a0), 10f
+	addi a1, a1, 1
+	addi a0, a0, 1
+	bltu a1, t0, 4b
+	j 1b
+5: /* Edge case: remainder */
+	fixup lbu, t2, (a1), 10f
+	fixup sb, t2, (a0), 10f
+	addi a1, a1, 1
+	addi a0, a0, 1
+	bltu a1, a3, 5b
+	j 3b
+/*6:
+	andi t1, a0, ~(4-1)
+	bne t1, a0, 2b
+	andi t1, a1, ~(4-1)
+	bne t1, a1, 2b
+	andi t1, a3, ~(4-1)
+7:
+	fixup lwu, t2, (a1), 10f
+	fixup sw, t2, (a0), 10f
+	addi a1, a1, 4
+	addi a0, a0, 4
+	bltu a1, t1, 7b
+	j 2b*/
 ENDPROC(__copy_user)
 
 
 ENTRY(__clear_user)
+
+	/*local irq save*/
+	csrrci t3, sstatus, SR_SIE
 
 	/* Enable access to user memory */
 	li t6, SR_SUM
@@ -76,6 +115,11 @@ ENTRY(__clear_user)
 3:
 	/* Disable access to user memory */
 	csrc sstatus, t6
+
+	/*local irq restore*/
+	andi t3, t3, SR_SIE
+	csrs sstatus, t3
+
 	li a0, 0
 	ret
 4: /* Edge case: unalignment */

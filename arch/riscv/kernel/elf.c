@@ -414,6 +414,7 @@ static int parse_riscv_attributes(const char* buf, const char* end)
 				pr_warn("Unknown RISCV attribute tag %lu", tag);
 				continue;
 		}
+
 	}
 	return -ENOEXEC;
 }

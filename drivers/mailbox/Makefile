@@ -5,6 +5,10 @@ obj-$(CONFIG_MAILBOX)		+= mailbox.o
 
 obj-$(CONFIG_MAILBOX_TEST)	+= mailbox-test.o
 
+obj-$(CONFIG_CANAAN_MBOX)	+= canaan-mailbox.o
+
+obj-$(CONFIG_CANAAN_MBOX_CLIENT)	+= canaan_mbox_client.o
+
 obj-$(CONFIG_ARM_MHU)	+= arm_mhu.o
 
 obj-$(CONFIG_PLATFORM_MHU)	+= platform_mhu.o

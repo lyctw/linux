@@ -294,5 +294,6 @@ source "drivers/clk/tegra/Kconfig"
 source "drivers/clk/ti/Kconfig"
 source "drivers/clk/uniphier/Kconfig"
 source "drivers/clk/sifive/Kconfig"
+source "drivers/clk/canaan/Kconfig"
 
 endmenu

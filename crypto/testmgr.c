@@ -3301,6 +3301,16 @@ static const struct alg_test_desc alg_test_descs[] = {
 			}
 		}
 	}, {
+        .alg = "cfb(aes)",
+		.test = alg_test_skcipher,
+		.fips_allowed = 1,
+		.suite = {
+			.cipher = {
+				.enc = __VECS(aes_cfb_enc_tv_template),
+				.dec = __VECS(aes_cfb_dec_tv_template)
+			}
+		}
+    }, {
 		.alg = "pcbc(fcrypt)",
 		.test = alg_test_skcipher,
 		.suite = {

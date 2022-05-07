@@ -1,0 +1,122 @@
+/* Copyright (c) 2022, Canaan Bright Sight Co., Ltd
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+*/
+
+#include <dt-bindings/pinctrl/k510.h>
+
+&iomux {
+/* pinctrl hog example*/
+/*    pinctrl-names = "default";
+    pinctrl-0 = <&emac_pins &mmc0_pins &mmc2_pins >; 
+*/
+
+    //RMII
+    emac_pins: iomux_emac_pins {
+        pinctrl-k510,pins = <
+          (35) (FUNC_EMAC_MDC)
+          (36) (FUNC_EMAC_MDIO)
+          (34) (FUNC_EMAC_RX_ER)
+          (38) (FUNC_EMAC_TX_EN)
+          (32) (FUNC_EMAC_CRS)
+          (46) (FUNC_EMAC_TX_D0)
+          (45) (FUNC_EMAC_TX_D1)
+          (42) (FUNC_EMAC_RX_D0)
+          (41) (FUNC_EMAC_RX_D1)
+          (29) (FUNC_EMAC_REF_IN)
+        >;
+    };
+
+/*
+    //RGMII
+    emac_pins: iomux_emac_pins {
+        pinctrl-k510,pins = <
+          (35) (FUNC_EMAC_MDC)
+          (36) (FUNC_EMAC_MDIO)
+          (29) (FUNC_EMAC_TX_CLK_OUT)
+          (38) (FUNC_EMAC_TX_CTL)
+          (46) (FUNC_EMAC_TX_D0)
+          (45) (FUNC_EMAC_TX_D1)
+          (44) (FUNC_EMAC_TX_D2)
+          (43) (FUNC_EMAC_TX_D3)
+          (30) (FUNC_EMAC_RX_CLK_IN)
+          (37) (FUNC_EMAC_RX_CTL)
+          (42) (FUNC_EMAC_RX_D0)
+          (41) (FUNC_EMAC_RX_D1)
+          (40) (FUNC_EMAC_RX_D2)
+          (39) (FUNC_EMAC_RX_D3)
+        >;
+    };
+*/
+/*
+    spi0_pins: iomux_spi0_pins {
+        pinctrl-k510,pins = <
+          (86) (FUNC_SPI0_CLK)
+          (87) (FUNC_SPI0_CS)
+          (88) (FUNC_SPI0_D0)
+          (89) (FUNC_SPI0_D1)
+          (90) (FUNC_SPI0_D2)
+          (91) (FUNC_SPI0_D3)
+          (92) (FUNC_SPI0_D4)
+          (93) (FUNC_SPI0_D5)
+          (94) (FUNC_SPI0_D6)
+          (95) (FUNC_SPI0_D7)
+        >;
+    };
+*/
+    mmc0_pins: iomux_mmc0_pins {
+        pinctrl-k510,pins = <
+          (7) (FUNC_MMC0_CLK)
+          (8) (FUNC_MMC0_CMD)
+          (9) (FUNC_MMC0_DATA7)
+          (10) (FUNC_MMC0_DATA6)
+          (11) (FUNC_MMC0_DATA5)
+          (12) (FUNC_MMC0_DATA4)
+          (13) (FUNC_MMC0_DATA3)
+          (14) (FUNC_MMC0_DATA2)
+          (15) (FUNC_MMC0_DATA1)
+          (16) (FUNC_MMC0_DATA0)
+        >;
+    };
+
+    mmc2_pins: iomux_mmc2_pins {
+        pinctrl-k510,pins = <
+          (23) (FUNC_MMC2_CLK)
+          (24) (FUNC_MMC2_CMD)
+          (25) (FUNC_MMC2_DATA3)
+          (26) (FUNC_MMC2_DATA2)
+          (27) (FUNC_MMC2_DATA1)
+          (28) (FUNC_MMC2_DATA0)
+        >;
+    };
+
+/*	
+    bt1120_pins: iomux_bt1120_pins {
+        pinctrl-k510,pins = <
+			(67) (FUNC_BT1120_OUT_DATA_D0)
+			(68) (FUNC_BT1120_OUT_DATA_D1)
+			(69) (FUNC_BT1120_OUT_DATA_D2)
+			(70) (FUNC_BT1120_OUT_DATA_D3)
+			(71) (FUNC_BT1120_OUT_DATA_D4)
+			(72) (FUNC_BT1120_OUT_DATA_D5)
+			(73) (FUNC_BT1120_OUT_DATA_D6)
+			(74) (FUNC_BT1120_OUT_DATA_D7)
+			(75) (FUNC_BT1120_OUT_DATA_C0)
+			(76) (FUNC_BT1120_OUT_DATA_C1)
+			(77) (FUNC_BT1120_OUT_DATA_C2)
+			(78) (FUNC_BT1120_OUT_DATA_C3)
+			(79) (FUNC_BT1120_OUT_DATA_C4)
+			(80) (FUNC_BT1120_OUT_DATA_C5)
+			(81) (FUNC_BT1120_OUT_DATA_C6)
+			(82) (FUNC_BT1120_OUT_DATA_C7)
+			(83) (FUNC_BT1120_OUT_CLK    )
+			(84) (FUNC_BT1120_OUT_VSYNC  )
+			(85) (FUNC_BT1120_OUT_HSYNC  )
+        >;
+    };
+*/
+};
+
+

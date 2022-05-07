@@ -1,0 +1,3082 @@
+/* Copyright (c) 2022, Canaan Bright Sight Co., Ltd
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+*/
+
+/*readme:
+  1. sysctl_boot include osc25m(gate),osc32k,pll0-3.
+  2. sysctl_clk include other clks description 
+*/
+&sysctl_boot {
+    /* sysctl_boot clk tree
+       osc25m----->gate------>|-->pll0----->|--------->pll0      clk output--->to sysctl_clock module
+                              |             |--div2--->pll0_div2 clk output--->to sysctl_clock module
+                              |             |--div3--->pll0_div3 clk output--->to sysctl_clock module
+                              |             |--div4--->pll0_div4 clk output--->to sysctl_clock module
+                              |
+                              |-->pll1----->|--------->pll1      clk output--->to sysctl_clock module
+                              |             |--div2--->pll1_div2 clk output--->to sysctl_clock module
+                              |             |--div3--->pll1_div3 clk output--->to sysctl_clock module
+                              |             |--div4--->pll1_div4 clk output--->to sysctl_clock module
+                              |
+                              |-->pll2----->|--------->pll2      clk output--->to sysctl_clock module
+                              |             |--div2--->pll2_div2 clk output--->to sysctl_clock module
+                              |             |--div3--->pll2_div3 clk output--->to sysctl_clock module
+                              |             |--div4--->pll2_div4 clk output--->to sysctl_clock module
+                              |
+                              |-->pll3----->|--------->pll3      clk output--->to sysctl_clock module
+                              |             |--div2--->pll3_div2 clk output--->to sysctl_clock module
+                              |             |--div3--->pll3_div3 clk output--->to sysctl_clock module
+                              |             |--div4--->pll3_div4 clk output--->to sysctl_clock module
+                              |
+                              |----------------------------------------------->to sysctl_clock module
+
+       osc32k----------------------------------------------------------------->to sysctl_clock module
+    */
+    osc25m: osc25m {
+        #clock-cells                            = <0>;                          /* only one clock output */
+        compatible                              = "fixed-clock";                /* It's clock source, no parent */
+        clock-frequency                         = <25000000>;                   /* clock freqence is 25MHz */
+        clock-accuracy                          = <0>;                          /* software assume clock no jitter/wander.*/
+    };
+
+    osc32k: osc32k {
+        #clock-cells                            = <0>;
+        compatible                              = "fixed-clock";
+        clock-frequency                         = <32768>;
+        clock-accuracy                          = <0>;
+    };
+    /* osc25m could be gated by sysctl boot */
+    /* gate mask bit 16, CLK_GATE_HIWORD_MASK flag should be set by driver */
+    osc25m_gate:osc25m_gate {
+        #clock-cells                            = <0>;                          /* only one output */
+        compatible                              = "canaan,k510-osc25m-gate";
+        clocks                                  = <&osc25m>;                    /* parent is osc25m, parent has only one clock output */
+        clk-gate-reg-offset                     = <0x48>;                       /* clock gate register offset. absolute address = sysctl_boot_address(0x97000000) +0x48 */
+        clk-gate-reg-enable-bit                 = <0>;                          /* clock gate register bit */
+
+        /* reverse     gate-enable-bit       gate_status
+              0              0               clk disable
+              0              1               clk enable
+              1              0               clk enable
+              1              1               clk disable
+        */
+        clk-gate-reg-enable-bit-reverse         = <1>;
+    };
+
+    /* clk composite */
+    pll0: pll0 {
+        #clock-cells                            = <0>;                          /* only one output */
+        compatible                              = "canaan,k510-pll";            /* pll0/1/2/3 match same clk driver, comptible is k510-pll(not k510-pll0,1,2,3)*/
+        clocks                                  = <&osc25m_gate>;               /* clk parent is osc25m_gate */
+        /* Fout = Fref * NF / NR / OD 
+          source_clk: osc25m_gate
+          NF:   fb
+          NR:   ref
+          OD:   out
+          Fout = source_clk(25M) * fb / ref / out 
+        */
+        clk-divide-reg-offset                   = <0x0>;                        /* pll divider register offset */
+        clk-divide-out-reg-value-shift          = <24>;                         /* start bit is 24 */
+        clk-divide-out-reg-value-mask           = <0xF>;                        /* bitmask, 0xf means b'1111(4bits), bit24(start bit) to bit27 */
+        clk-divide-out-reg-write-enable-bit     = <30>;                         /* bit 30 for write-enable(disable)*/
+        clk-divide-ref-reg-value-shift          = <16>;
+        clk-divide-ref-reg-value-mask           = <0x3F>;
+        clk-divide-ref-reg-write-enable-bit     = <29>;
+        clk-divide-fb-reg-value-shift           = <0>;
+        clk-divide-fb-reg-value-mask            = <0xFFF>;
+        clk-divide-fb-reg-write-enable-bit      = <28>;
+
+        clk-divide-bypass-reg-offset            = <0x4>;
+        clk-divide-bypass-reg-enable-bit        = <19>;
+        clk-divide-bypass-reg-write-enable-bit  = <28>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x8>;
+        clk-gate-reg-enable-bit                 = <8>;
+        clk-gate-reg-write-enable-bit           = <26>;
+
+        /* pll lock status */
+        clk-lock-reg-offset                     = <0xc>;
+        clk-lock-reg-status_bit                 = <0>;
+    };
+
+    pll0_div2: pll0_div2 {
+        #clock-cells                            = <0>;
+        compatible                              = "fixed-factor-clock";
+        clocks                                  = <&pll0>;
+        clock-div                               = <2>;
+        clock-mult                              = <1>;
+    };
+
+    pll0_div3: pll0_div3 {
+        #clock-cells                            = <0>;
+        compatible                              = "fixed-factor-clock";
+        clocks                                  = <&pll0>;
+        clock-div                               = <3>;
+        clock-mult                              = <1>;
+    };
+
+    pll0_div4: pll0_div4 {
+        #clock-cells                            = <0>;
+        compatible                              = "fixed-factor-clock";
+        clocks                                  = <&pll0>;
+        clock-div                               = <4>;
+        clock-mult                              = <1>;
+    };
+
+    pll1: pll1 {
+        #clock-cells                            = <0>;                          /* only one output */
+        compatible                              = "canaan,k510-pll";            /* pll0/1/2/3 match same clk driver, so comptible is k510-pll(not k510-pll0,1,2,3)*/
+        clocks                                  = <&osc25m_gate>;               /* clk parent is osc25m_gate */
+
+        clk-divide-reg-offset                  	= <0x10>;
+        clk-divide-out-reg-value-shift          = <24>;
+        clk-divide-out-reg-value-mask           = <0xF>;
+        clk-divide-out-reg-write-enable-bit     = <30>;
+        clk-divide-ref-reg-value-shift          = <16>;
+        clk-divide-ref-reg-value-mask           = <0x3F>;
+        clk-divide-ref-reg-write-enable-bit     = <29>;
+        clk-divide-fb-reg-value-shift           = <0>;
+        clk-divide-fb-reg-value-mask            = <0xFFF>;
+        clk-divide-fb-reg-write-enable-bit      = <28>;
+
+        clk-divide-bypass-reg-offset            = <0x14>;
+        clk-divide-bypass-reg-enable-bit        = <19>;
+        clk-divide-bypass-reg-write-enable-bit  = <28>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x18>;
+        clk-gate-reg-enable-bit                 = <8>;
+        clk-gate-reg-write-enable-bit           = <26>;
+
+        /* pll lock status */
+        clk-lock-reg-offset                     = <0x1c>;
+        clk-lock-reg-status_bit                 = <0>;
+    };
+
+    pll1_div2: pll1_div2 {
+        #clock-cells                            = <0>;
+        compatible                              = "fixed-factor-clock";
+        clocks                                  = <&pll1>;
+        clock-div                               = <2>;
+        clock-mult                              = <1>;
+    };
+
+    pll1_div3: pll1_div3 {
+        #clock-cells                            = <0>;
+        compatible                              = "fixed-factor-clock";
+        clocks                                  = <&pll1>;
+        clock-div                               = <3>;
+        clock-mult                              = <1>;
+    };
+
+    pll1_div4: pll1_div4 {
+        #clock-cells                            = <0>;
+        compatible                              = "fixed-factor-clock";
+        clocks                                  = <&pll1>;
+        clock-div                               = <4>;
+        clock-mult                              = <1>;
+    };
+
+    pll2: pll2 {
+        #clock-cells                            = <0>;                          /* only one output */
+        compatible                              = "canaan,k510-pll";            /* pll0/1/2/3 match same clk driver, so comptible is k510-pll(not k510-pll0,1,2,3)*/
+        clocks                                  = <&osc25m_gate>;               /* clk parent is osc25m_gate */
+
+        clk-divide-reg-offset                   = <0x20>;
+        clk-divide-out-reg-value-shift          = <24>;
+        clk-divide-out-reg-value-mask           = <0xF>;
+        clk-divide-out-reg-write-enable-bit     = <30>;
+        clk-divide-ref-reg-value-shift          = <16>;
+        clk-divide-ref-reg-value-mask           = <0x3F>;
+        clk-divide-ref-reg-write-enable-bit     = <29>;
+        clk-divide-fb-reg-value-shift           = <0>;
+        clk-divide-fb-reg-value-mask            = <0xFFF>;
+        clk-divide-fb-reg-write-enable-bit      = <28>;
+
+
+        clk-divide-bypass-reg-offset            = <0x24>;
+        clk-divide-bypass-reg-enable-bit        = <19>;
+        clk-divide-bypass-reg-write-enable-bit  = <28>;
+        /* gate */
+        clk-gate-reg-offset                     = <0x28>;
+        clk-gate-reg-enable-bit                 = <8>;
+        clk-gate-reg-write-enable-bit           = <26>;
+
+        /* pll lock status */
+        clk-lock-reg-offset                     = <0x2c>;
+        clk-lock-reg-status_bit                 = <0>;
+    };
+
+    pll2_div2: pll2_div2 {
+        #clock-cells                            = <0>;
+        compatible                              = "fixed-factor-clock";
+        clocks                                  = <&pll2>;
+        clock-div                               = <2>;
+        clock-mult                              = <1>;
+    };
+
+    pll2_div3: pll2_div3 {
+        #clock-cells                            = <0>;
+        compatible                              = "fixed-factor-clock";
+        clocks                                  = <&pll2>;
+        clock-div                               = <3>;
+        clock-mult                              = <1>;
+    };
+
+    pll2_div4: pll2_div4 {
+        #clock-cells                            = <0>;
+        compatible                              = "fixed-factor-clock";
+        clocks                                  = <&pll2>;
+        clock-div                               = <4>;
+        clock-mult                              = <1>;
+    };
+
+    pll3: pll3 {
+        #clock-cells                            = <0>;                          /* only one output */
+        compatible                              = "canaan,k510-pll";            /* pll0/1/2/3 match same clk driver, so comptible is k510-pll(not k510-pll0,1,2,3)*/
+        clocks                                  = <&osc25m_gate>;               /* clk parent is osc25m_gate */
+
+        clk-divide-reg-offset                   = <0x30>;
+        clk-divide-out-reg-value-shift          = <24>;
+        clk-divide-out-reg-value-mask           = <0xF>;
+        clk-divide-out-reg-write-enable-bit     = <30>;
+        clk-divide-ref-reg-value-shift          = <16>;
+        clk-divide-ref-reg-value-mask           = <0x3F>;
+        clk-divide-ref-reg-write-enable-bit     = <29>;
+        clk-divide-fb-reg-value-shift           = <0>;
+        clk-divide-fb-reg-value-mask            = <0xFFF>;
+        clk-divide-fb-reg-write-enable-bit      = <28>;
+
+
+        clk-divide-bypass-reg-offset            = <0x34>;
+        clk-divide-bypass-reg-enable-bit        = <19>;
+        clk-divide-bypass-reg-write-enable-bit  = <28>;
+        /* gate */
+        clk-gate-reg-offset                     = <0x38>;
+        clk-gate-reg-enable-bit                 = <8>;
+        clk-gate-reg-write-enable-bit           = <26>;
+
+        /* pll lock status */
+        clk-lock-reg-offset                     = <0x3c>;
+        clk-lock-reg-status_bit                 = <0>;
+    };
+
+    pll3_div2: pll3_div2 {
+        #clock-cells                            = <0>;
+        compatible                              = "fixed-factor-clock";
+        clocks                                  = <&pll3>;
+        clock-div                               = <2>;
+        clock-mult                              = <1>;
+    };
+
+    pll3_div3: pll3_div3 {
+        #clock-cells                            = <0>;
+        compatible                              = "fixed-factor-clock";
+        clocks                                  = <&pll3>;
+        clock-div                               = <3>;
+        clock-mult                              = <1>;
+    };
+
+    pll3_div4: pll3_div4 {
+        #clock-cells                            = <0>;
+        compatible                              = "fixed-factor-clock";
+        clocks                                  = <&pll3>;
+        clock-div                               = <4>;
+        clock-mult                              = <1>;
+    };
+};
+
+/*-----------------------------------------------------------------------------------------------------------------*/
+
+/* 
+   xxx_trunk for clock tree trunk node
+   xxx_leaf for clock tree leaf node
+*/
+
+&sysctl_clock {
+    /* ax25mp clock tree
+                  +-+
+      pll2_div3-->|M \         |---GATE--->core0 clk
+           pll0-->|U |-->DIV-->|---GATE--->core1 clk
+      pll2_div2-->|X /         |---GATE--->core0 data cache clk
+                  +-+          |---GATE--->core1 data cache clk
+                               |---GATE--->noc & mctl p0 axi clk
+
+     1. ax25mp_src              --> MUX&DIV
+     2. ax25mp_core0            --> core0 clk gate
+     3. ax25mp_core1            --> core1 clk gate
+     4. ax25mp_core0_dc         --> core0 data cache clk gate
+     5. ax25mp_core1_dc         --> core1 data cache clk gate
+     6. ax25mp_noc_mctl         --> ddr controller p0 & noc AXI clock (for AX25MP)
+    */
+    
+    ax25mp_src: ax25mp_src {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+
+        /* parent */
+        clocks                                  = <&pll2_div3>, <&pll0>, <&pll2_div2>;  /* pll2 div3, pll0 nodiv, pll2 div2*/
+        clk-parent-reg-offset                   = <0x0>;
+        clk-parent-reg-value-shift              = <0>;
+        clk-parent-reg-value-mask               = <0x3>;
+        clk-parent-reg-write-enable-bit         = <24>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <12>;
+        clk-rate-conf-div-min                   = <12>;
+        clk-rate-conf-div-max                   = <12>;
+        clk-rate-calc-method                    = <0>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0x0>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <4>;
+        clk-rate-reg-div-value-mask             = <0xF>;
+        clk-rate-reg-write-enable-bit           = <25>;
+    };
+
+    ax25mp_core0: ax25mp_core0 {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&ax25mp_src>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x0>;
+        clk-gate-reg-bit-enable                 = <8>;
+        clk-gate-reg-write-enable-bit           = <26>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    ax25mp_core1: ax25mp_core1 {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&ax25mp_src>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x0>;
+        clk-gate-reg-bit-enable                 = <9>;
+        clk-gate-reg-write-enable-bit           = <27>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    ax25mp_core0_dc: ax25mp_core0_dc {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&ax25mp_src>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x0>;
+        clk-gate-reg-bit-enable                 = <10>;
+        clk-gate-reg-write-enable-bit           = <28>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    ax25mp_core1_dc: ax25mp_core1_dc {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&ax25mp_src>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x0>;
+        clk-gate-reg-bit-enable                 = <11>;
+        clk-gate-reg-write-enable-bit           = <29>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    ax25mp_noc_mctl: ax25mp_noc_mctl {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&ax25mp_src>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x168>;
+        clk-gate-reg-bit-enable                 = <9>;
+        clk-gate-reg-write-enable-bit           = <20>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* ax25m mtimer clock tree
+                    +-+
+      osc32k     -->|M \         
+      osc25m_gate-->|U |-->DIV-->|---GATE--->ax25m mtimer clk
+                    |X /
+                    +-+
+
+     1. ax25m_mtimer           --> MUX&DIV&GATE
+    */
+    ax25m_mtimer: ax25m_mtimer {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+
+        /* parent */
+        clocks                                  = <&osc32k>, <&osc25m_gate>;
+        clk-parent-reg-offset                   = <0x4>;
+        clk-parent-reg-value-shift              = <0>;
+        clk-parent-reg-value-mask               = <0x1>;
+        clk-parent-reg-write-enable-bit         = <24>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <32>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0x4>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <2>;
+        clk-rate-reg-div-value-mask             = <0x1F>;
+        clk-rate-reg-write-enable-bit           = <25>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x4>;
+        clk-gate-reg-bit-enable                 = <8>;
+        clk-gate-reg-write-enable-bit           = <26>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* ax25p clock tree
+                  +-+
+      pll2_div2-->|M \         |---GATE--->core clk
+           pll0-->|U |-->DIV-->|---GATE--->local memory clk
+                  |X /
+                  +-+
+
+     1. ax25p_src               --> MUX&DIV
+     2. ax25p_core              --> core clk gate
+     3. ax25p_lm                --> local memory gate
+    */
+    ax25p_src: ax25p_src {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+
+        /* parent */
+        clocks                                  = <&pll2_div3>, <&pll0>;                /* parent: pll2 div2 or pll0 nodiv */
+        clk-parent-reg-offset                   = <0x10>;
+        clk-parent-reg-value-shift              = <0>;
+        clk-parent-reg-value-mask               = <0x1>;
+        clk-parent-reg-write-enable-bit         = <24>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <6>;
+        clk-rate-conf-div-min                   = <6>;
+        clk-rate-conf-div-max                   = <6>;
+        clk-rate-calc-method                    = <0>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0x10>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <4>;
+        clk-rate-reg-div-value-mask             = <0x7>;
+        clk-rate-reg-write-enable-bit           = <25>;
+    };
+
+    ax25p_core: ax25p_core {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&ax25p_src>;                         /* parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x10>;
+        clk-gate-reg-bit-enable                 = <8>;
+        clk-gate-reg-write-enable-bit           = <26>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    ax25p_lm: ax25p_lm {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&ax25p_src>;                         /* parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x10>;
+        clk-gate-reg-bit-enable                 = <9>;
+        clk-gate-reg-write-enable-bit           = <27>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* ax25p mtimer clock tree
+                    +-+
+      osc32k     -->|M \         
+      osc25m_gate-->|U |-->DIV-->|---GATE--->ax25p mtimer clk
+                    |X /
+                    +-+
+
+     1. ax25p_mtimer            --> MUX&DIV&GATE
+    */
+    ax25p_mtimer: ax25p_mtimer {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+
+        /* parent */
+        clocks                                  = <&osc32k>, <&osc25m_gate>;            /* mux parent */
+        clk-parent-reg-offset                   = <0x14>;                               /* mux register offset */
+        clk-parent-reg-value-shift              = <0>;                                  /* mux field shift */
+        clk-parent-reg-value-mask               = <0x1>;                                /* mux field mask */
+        clk-parent-reg-write-enable-bit         = <24>;                                 /* mux writeable bit */
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;                                  /* min multiple*/
+        clk-rate-conf-mul-max                   = <1>;                                  /* max multiple*/
+        clk-rate-conf-div-min                   = <1>;                                  /* min divider*/
+        clk-rate-conf-div-max                   = <32>;                                 /* min divider*/
+        clk-rate-calc-method                    = <1>;                                  /* 0 for multiple can be changed, 1 for divider can be changed, 2 for div&mul can be changed */
+
+        clk-rate-reg-offset                     = <0x14>;                               /* divider register offset */
+        clk-rate-reg-mul-value-shift            = <0>;                                  /* multiple field shift. It's valid when clk-rate-calc-method = 2 */
+        clk-rate-reg-mul-value-mask             = <0>;                                  /* multiple field mask.  It's valid when clk-rate-calc-method = 2 */
+        clk-rate-reg-div-value-shift            = <2>;                                  /* divider field shift.*/
+        clk-rate-reg-div-value-mask             = <0x1F>;                               /* divider field mask. */
+        clk-rate-reg-write-enable-bit           = <25>;                                 /* divider write enable register */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x14>;                               /* gate register offset */
+        clk-gate-reg-bit-enable                 = <8>;                                  /* gate enable bit */
+        clk-gate-reg-write-enable-bit           = <26>;                                 /* gate enable write enable bit */
+        clk-gate-reg-bit-reverse                = <0>;                                  /* if set to 0(clk-gate-reg-bit-enable set 1 to enable clcok),  if set to 1(clk-gate-reg-bit-enable set 0 to enable clcok) */
+    };
+
+    /* gnne system clock tree
+                  +-+
+      pll0_div2-->|M \
+                  |U |-->DIV-->|---GATE--->gnne system clk
+      pll1_div2-->|X /
+                  +-+
+
+     1. gnne_sys_clk_mux_div_gate               --> MUX&DIV&GATE
+    */
+    gnne_sys: gnne_sys {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+
+        /* parent */
+        clocks                                  = <&pll0_div2>, <&pll1_div2>;           /* mux parent */
+        clk-parent-reg-offset                   = <0x28>;                               /* mux register offset */
+        clk-parent-reg-value-shift              = <0>;                                  /* mux field shift */
+        clk-parent-reg-value-mask               = <0x1>;                                /* mux field mask */
+        clk-parent-reg-write-enable-bit         = <24>;                                 /* mux writeable bit */
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;                                  /* min multiple*/
+        clk-rate-conf-mul-max                   = <6>;                                  /* max multiple*/
+        clk-rate-conf-div-min                   = <6>;                                  /* min divider*/
+        clk-rate-conf-div-max                   = <6>;                                  /* min divider*/
+        clk-rate-calc-method                    = <0>;                                  /* 0 for multiple can be changed, 1 for divider can be changed, 2 for div&mul can be changed */
+
+        clk-rate-reg-offset                     = <0x28>;                               /* divider register offset */
+        clk-rate-reg-mul-value-shift            = <0>;                                  /* multiple field shift. It's valid when clk-rate-calc-method = 2 */
+        clk-rate-reg-mul-value-mask             = <0>;                                  /* multiple field mask.  It's valid when clk-rate-calc-method = 2 */
+        clk-rate-reg-div-value-shift            = <4>;                                  /* divider field shift. */
+        clk-rate-reg-div-value-mask             = <0x7>;                                /* divider field mask.  */
+        clk-rate-reg-write-enable-bit           = <25>;                                 /* divider write enable register */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x28>;                               /* gate register offset */
+        clk-gate-reg-bit-enable                 = <8>;                                  /* gate enable bit */
+        clk-gate-reg-write-enable-bit           = <26>;                                 /* gate enable write enable bit */
+        clk-gate-reg-bit-reverse                = <0>;                                  /* if set to 0(clk-gate-reg-bit-enable set 1 to enable clcok),  if set to 1(clk-gate-reg-bit-enable set 0 to enable clcok) */
+    };
+
+    /* gnne axi clock tree
+                  +-+
+      pll0_div2-->|M \         |---GATE--->gnne&noc axi clk
+                  |U |-->DIV-->|
+      pll1_div2-->|X /         |---GATE--->gnne mctl_p0 & noc axi clk
+                  +-+
+
+     1. gnne_axi_noc_mctl_p1_mux_div            --> MUX&DIV
+     2. gnne_axi_noc_gate                       --> gnne axi noc gate
+     3. gnne_noc_axi_mctl_p1_gate               --> gnne noc&mctl_p1 gate
+    */
+    gnne_axi: gnne_axi {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+
+        /* parent */
+        clocks                                  = <&pll0_div2>, <&pll1_div2>;           /* mux parent */
+        clk-parent-reg-offset                   = <0x20>;                               /* mux register offset */
+        clk-parent-reg-value-shift              = <0>;                                  /* mux field shift */
+        clk-parent-reg-value-mask               = <0x1>;                                /* mux field mask */
+        clk-parent-reg-write-enable-bit         = <24>;                                 /* mux writeable bit */
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;                                  /* min multiple*/
+        clk-rate-conf-mul-max                   = <6>;                                  /* max multiple*/
+        clk-rate-conf-div-min                   = <6>;                                  /* min divider*/
+        clk-rate-conf-div-max                   = <6>;                                  /* min divider*/
+        clk-rate-calc-method                    = <0>;                                  /* 0 for multiple can be changed, 1 for divider can be changed, 2 for div&mul can be changed */
+
+        clk-rate-reg-offset                     = <0x20>;                               /* divider register offset */
+        clk-rate-reg-mul-value-shift            = <0>;                                  /* multiple field shift. It's valid when clk-rate-calc-method = 2 */
+        clk-rate-reg-mul-value-mask             = <0>;                                  /* multiple field mask.  It's valid when clk-rate-calc-method = 2 */
+        clk-rate-reg-div-value-shift            = <4>;                                  /* divider field shift. */
+        clk-rate-reg-div-value-mask             = <0x7>;                                /* divider field mask.  */
+        clk-rate-reg-write-enable-bit           = <25>;                                 /* divider write enable register */
+    };
+
+    gnne_axi_noc: gnne_axi_noc {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&gnne_axi>;
+        /* gate */
+        clk-gate-reg-offset                     = <0x20>;                               /* gate register offset */
+        clk-gate-reg-bit-enable                 = <9>;                                  /* gate enable bit */
+        clk-gate-reg-write-enable-bit           = <27>;                                 /* gate enable write enable bit */
+        clk-gate-reg-bit-reverse                = <0>;                                  /* if set to 0(clk-gate-reg-bit-enable set 1 to enable clcok),  if set to 1(clk-gate-reg-bit-enable set 0 to enable clcok) */
+    };
+
+    gnne_axi_mctl: gnne_axi_mctl {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&gnne_axi>;
+        /* gate */
+        clk-gate-reg-offset                     = <0x168>;
+        clk-gate-reg-bit-enable                 = <10>;
+        clk-gate-reg-write-enable-bit           = <21>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* noc clk0 tree
+                  +-+
+      pll0_div2-->|M \         |---DIV1--->noc_clk0--->|----GATE--->peri dma axi clk
+                  |U |-->DIV-->|                       |----GATE--->sys dma axi clk
+      pll1_div2-->|X /         |                       |----GATE--->sram0 axi clk
+                  +-+          |                       |----GATE--->sram1 axi clk
+                               |                       |----GATE--->noc&mctl_p3 clk
+                               |
+                               |-DIV2->noc_clk0_div2-->|----GATE--->mctl_ahb_config
+                               |                       |----GATE--->usb_ahb
+                               |                       |----GATE--->sd_slv_ahb
+                               |
+                               |-DIV3->noc_clk0_div3-->|----GATE--->sd0-2_ahb
+                               |                       |----GATE--->emca_ahb
+                               |                       |----GATE--->peridma_ahb
+                               |                       |----GATE--->sysdma_ahb
+                               |
+                               |-DIV4->noc_clk0_div4-->|----GATE--->wdt0-2_ahb
+                                                       |----GATE--->timer_ahb
+                                                       |----GATE--->rtc_ahb
+                                                       |----GATE--->gpio_ahb
+                                                       |----GATE--->iomux_ahb
+                                                       |----GATE--->i2c0-6_ahb
+                                                       |----GATE--->pwm_ahb
+                                                       |----GATE--->mailbox_ahb
+                                                       |----GATE--->vad_ahb
+
+     1. noc_clk0_mux_div                        --> MUX&DIV&DIV1 noc_clk0(div1)
+     2. noc_clk0_div2                           --> noc_clk0 div2
+     3. noc_clk0_div2                           --> noc_clk0 div3
+     4. noc_clk0_div4                           --> noc_clk0 div4
+
+     5. peri_dma_axi_gate                       --> peri dma axi gate,              clk source noc_clk0_mux_div.
+     6. sys_dma_axi_gate                        --> peri dma axi gate,              clk source noc_clk0_mux_div.
+     7. sram0_axi_gate                          --> sram0 axi gate,                 clk source noc_clk0_mux_div.
+     8. sram1_axi_gate                          --> sram1 axi gate,                 clk source noc_clk0_mux_div.
+     9. noc_clk0_noc_axi_mctl_p3_gate           --> noc clock0 & mctl_p3 gate,      clk source noc_clk0_mux_div.
+
+     10.mctl_noc_ahb_mctl_gate                  --> noc-ahb-mctl config bus gate,   clk source noc_clk0_div2.
+     11.usb_ahb_gate                            --> noc-ahb-usb config bus gate,    clk source noc_clk0_div2.
+     12.sd_slv_ahb_gate                         --> noc-ahb-sd-slv config bus gate, clk source noc_clk0_div2.
+
+     13.sd0_ahb_gate                            --> noc-ahb-sd0 config bus gate,    clk source noc_clk0_div3.
+     14.sd1_ahb_gate                            --> noc-ahb-sd1 config bus gate,    clk source noc_clk0_div3.
+     15.sd2_ahb_gate                            --> noc-ahb-sd2 config bus gate,    clk source noc_clk0_div3.
+     15.emac_ahb_gate                           --> noc-ahb-emac config bus gate,   clk source noc_clk0_div3.
+     16.peri_dma_ahb_gate                       --> noc-ahb-peridma config bus gate,clk source noc_clk0_div3.
+     17.sys_dma_ahb_gate                        --> noc-ahb-sysdma config bus gate, clk source noc_clk0_div3.
+
+     18.wdt0_ahb_gate                           --> noc-apb-wdt0 config bus gate,   clk source noc_clk0_div4.
+     19.wdt1_ahb_gate                           --> noc-apb-wdt1 config bus gate,   clk source noc_clk0_div4.
+     20.wdt2_ahb_gate                           --> noc-apb-wdt2 config bus gate,   clk source noc_clk0_div4.
+     21.timer_ahb_gate                          --> noc-apb-timer config bus gate,  clk source noc_clk0_div4.
+     22.rtc_ahb_gate                            --> noc-apb-rtc config bus gate,    clk source noc_clk0_div4.
+     23.gpio_ahb_gate                           --> noc-apb-gpio config bus gate,   clk source noc_clk0_div4.
+     24.iomux_ahb_gate                          --> noc-apb-iomux config bus gate,  clk source noc_clk0_div4.
+     25.i2c(0-6)_ahb_gate                       --> noc-apb-i2c config bus gate,    clk source noc_clk0_div4
+     26.pwm_ahb_gate                            --> noc-apb-pwm config bus gate,    clk source noc_clk0_div4.
+     27.mailbox_ahb_gate                        --> noc-apb-mailbox config bus gate,clk source noc_clk0_div4.
+     28.vad_ahb_gate                            --> noc-apb-vad config bus gate,    clk source noc_clk0_div4.
+    */
+    noc_clk0: noc_clk0 {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+
+        /* parent */
+        clocks                                  = <&pll0_div2>, <&pll1_div2>;           /* mux parent */
+        clk-parent-reg-offset                   = <0x40>;                               /* mux register offset */
+        clk-parent-reg-value-shift              = <0>;                                  /* mux field shift */
+        clk-parent-reg-value-mask               = <0x1>;                                /* mux field mask */
+        clk-parent-reg-write-enable-bit         = <24>;                                 /* mux writeable bit */
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;                                  /* min multiple*/
+        clk-rate-conf-mul-max                   = <6>;                                  /* max multiple*/
+        clk-rate-conf-div-min                   = <6>;                                  /* min divider*/
+        clk-rate-conf-div-max                   = <6>;                                  /* min divider*/
+        clk-rate-calc-method                    = <0>;                                  /* 0 for multiple can be changed, 1 for divider can be changed, 2 for div&mul can be changed */
+
+        clk-rate-reg-offset                     = <0x40>;                               /* divider register offset */
+        clk-rate-reg-mul-value-shift            = <0>;                                  /* multiple field shift. It's valid when clk-rate-calc-method = 2 */
+        clk-rate-reg-mul-value-mask             = <0>;                                  /* multiple field mask.  It's valid when clk-rate-calc-method = 2 */
+        clk-rate-reg-div-value-shift            = <4>;                                  /* divider field shift. */
+        clk-rate-reg-div-value-mask             = <0x7>;                                /* divider field mask.  */
+        clk-rate-reg-write-enable-bit           = <25>;                                 /* divider write enable bit */
+    };
+    noc_clk0_div2: noc_clk0_div2 {
+        #clock-cells                            = <0>;
+        compatible                              = "fixed-factor-clock";
+        clocks                                  = <&noc_clk0>;
+        clock-div                               = <2>;
+        clock-mult                              = <1>;
+    };
+    noc_clk0_div3: noc_clk0_div3 {
+        #clock-cells                            = <0>;
+        compatible                              = "fixed-factor-clock";
+        clocks                                  = <&noc_clk0>;
+        clock-div                               = <3>;
+        clock-mult                              = <1>;
+    };
+    noc_clk0_div4:noc_clk0_div4 {
+        #clock-cells                            = <0>;
+        compatible                              = "fixed-factor-clock";
+        clocks                                  = <&noc_clk0>;
+        clock-div                               = <4>;
+        clock-mult                              = <1>;
+    };
+
+    /* noc clk0 subnode */
+    peri_dma_axi: peri_dma_axi {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x100>;                              /* gate register offset */
+        clk-gate-reg-bit-enable                 = <4>;                                  /* gate enable bit */
+        clk-gate-reg-write-enable-bit           = <20>;                                 /* gate enable write enable bit */
+        clk-gate-reg-bit-reverse                = <0>;                                  /* if set to 0(clk-gate-reg-bit-enable set 1 to enable clcok),  if set to 1(clk-gate-reg-bit-enable set 0 to enable clcok) */
+    };
+    sys_dma_axi: sys_dma_axi {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x100>;                              /* gate register offset */
+        clk-gate-reg-bit-enable                 = <5>;                                  /* gate enable bit */
+        clk-gate-reg-write-enable-bit           = <21>;                                 /* gate enable write enable bit */
+        clk-gate-reg-bit-reverse                = <0>;                                  /* if set to 0(clk-gate-reg-bit-enable set 1 to enable clcok),  if set to 1(clk-gate-reg-bit-enable set 0 to enable clcok) */
+    };
+    sram0_axi: sram0_axi {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0xA0>;                               /* gate register offset */
+        clk-gate-reg-bit-enable                 = <0>;                                  /* gate enable bit */
+        clk-gate-reg-write-enable-bit           = <16>;                                 /* gate enable write enable bit */
+        clk-gate-reg-bit-reverse                = <0>;                                  /* if set to 0(clk-gate-reg-bit-enable set 1 to enable clcok),  if set to 1(clk-gate-reg-bit-enable set 0 to enable clcok) */
+    };
+    sram1_axi: sram1_axi {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0xA0>;                               /* gate register offset */
+        clk-gate-reg-bit-enable                 = <1>;                                  /* gate enable bit */
+        clk-gate-reg-write-enable-bit           = <17>;                                 /* gate enable write enable bit */
+        clk-gate-reg-bit-reverse                = <0>;                                  /* if set to 0(clk-gate-reg-bit-enable set 1 to enable clcok),  if set to 1(clk-gate-reg-bit-enable set 0 to enable clcok) */
+    };
+    noc0_axi_p3: noc0_axi_p3 {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0>;
+        /* gate */
+        clk-gate-reg-offset                     = <0x168>;
+        clk-gate-reg-bit-enable                 = <12>;
+        clk-gate-reg-write-enable-bit           = <23>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* noc clk0 div2 subnode */
+    noc0_mctl_ahb: noc0_mctl_ahb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0_div2>;
+        /* gate */
+        clk-gate-reg-offset                     = <0x168>;
+        clk-gate-reg-bit-enable                 = <13>;
+        clk-gate-reg-write-enable-bit           = <24>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    usb_ahb:usb_ahb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0_div2>;
+        /* gate */
+        clk-gate-reg-offset                     = <0x154>;
+        clk-gate-reg-bit-enable                 = <0>;
+        clk-gate-reg-write-enable-bit           = <16>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    sd_slv_ahb: sd_slv_ahb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0_div2>;
+        /* gate */
+        clk-gate-reg-offset                     = <0x100>;
+        clk-gate-reg-bit-enable                 = <7>;
+        clk-gate-reg-write-enable-bit           = <23>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* noc clk0 div3 subnode */
+    sd_0_apb: sd_0_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0_div3>;
+        /* gate */
+        clk-gate-reg-offset                     = <0x100>;
+        clk-gate-reg-bit-enable                 = <0>;
+        clk-gate-reg-write-enable-bit           = <16>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    sd_1_apb: sd_1_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0_div3>;
+        /* gate */
+        clk-gate-reg-offset                     = <0x100>;
+        clk-gate-reg-bit-enable                 = <1>;
+        clk-gate-reg-write-enable-bit           = <17>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    sd_2_apb: sd_2_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0_div3>;
+        /* gate */
+        clk-gate-reg-offset                     = <0x100>;
+        clk-gate-reg-bit-enable                 = <2>;
+        clk-gate-reg-write-enable-bit           = <18>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    emac_apb: emac_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0_div3>;
+        /* gate */
+        clk-gate-reg-offset                     = <0x100>;
+        clk-gate-reg-bit-enable                 = <3>;
+        clk-gate-reg-write-enable-bit           = <19>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    peridma_apb: peridma_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0_div3>;
+        /* gate */
+        clk-gate-reg-offset                     = <0x100>;
+        clk-gate-reg-bit-enable                 = <4>;
+        clk-gate-reg-write-enable-bit           = <20>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    sysdma_apb: sysdma_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0_div3>;
+        /* gate */
+        clk-gate-reg-offset                     = <0x100>;
+        clk-gate-reg-bit-enable                 = <5>;
+        clk-gate-reg-write-enable-bit           = <21>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* noc clk0 div4 subnode */
+    wdt_0_apb: wdt_0_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0_div4>;
+        /* gate */
+        clk-gate-reg-offset                     = <0xB0>;
+        clk-gate-reg-bit-enable                 = <3>;
+        clk-gate-reg-write-enable-bit           = <19>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    wdt_1_apb: wdt_1_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0_div4>;
+        /* gate */
+        clk-gate-reg-offset                     = <0xB0>;
+        clk-gate-reg-bit-enable                 = <4>;
+        clk-gate-reg-write-enable-bit           = <20>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    wdt_2_apb: wdt_2_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0_div4>;
+        /* gate */
+        clk-gate-reg-offset                     = <0xB0>;
+        clk-gate-reg-bit-enable                 = <5>;
+        clk-gate-reg-write-enable-bit           = <21>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    timer_apb: timer_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0_div4>;
+        /* gate */
+        clk-gate-reg-offset                     = <0xB0>;
+        clk-gate-reg-bit-enable                 = <6>;
+        clk-gate-reg-write-enable-bit           = <22>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    rtc_apb: rtc_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0_div4>;
+        /* gate */
+        clk-gate-reg-offset                     = <0xB0>;
+        clk-gate-reg-bit-enable                 = <9>;
+        clk-gate-reg-write-enable-bit           = <25>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    gpio_apb: gpio_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0_div4>;
+        /* gate */
+        clk-gate-reg-offset                     = <0xB0>;
+        clk-gate-reg-bit-enable                 = <8>;
+        clk-gate-reg-write-enable-bit           = <24>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    iomux_apb: iomux_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0_div4>;
+        /* gate */
+        clk-gate-reg-offset                     = <0xB0>;
+        clk-gate-reg-bit-enable                 = <7>;
+        clk-gate-reg-write-enable-bit           = <23>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    i2c_0_apb: i2c_0_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0_div4>;
+        /* gate */
+        clk-gate-reg-offset                     = <0xB0>;
+        clk-gate-reg-bit-enable                 = <0>;
+        clk-gate-reg-write-enable-bit           = <16>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    i2c_1_apb: i2c_1_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0_div4>;
+        /* gate */
+        clk-gate-reg-offset                     = <0xB0>;
+        clk-gate-reg-bit-enable                 = <1>;
+        clk-gate-reg-write-enable-bit           = <17>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    i2c_2_apb: i2c_2_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0_div4>;
+        /* gate */
+        clk-gate-reg-offset                     = <0xB0>;
+        clk-gate-reg-bit-enable                 = <2>;
+        clk-gate-reg-write-enable-bit           = <18>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    i2c_3_apb: i2c_3_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0_div4>;
+        /* gate */
+        clk-gate-reg-offset                     = <0xB4>;
+        clk-gate-reg-bit-enable                 = <0>;
+        clk-gate-reg-write-enable-bit           = <16>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    i2c_4_apb: i2c_4_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0_div4>;
+        /* gate */
+        clk-gate-reg-offset                     = <0xB4>;
+        clk-gate-reg-bit-enable                 = <1>;
+        clk-gate-reg-write-enable-bit           = <17>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    i2c_5_apb: i2c_5_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0_div4>;
+        /* gate */
+        clk-gate-reg-offset                     = <0xB4>;
+        clk-gate-reg-bit-enable                 = <2>;
+        clk-gate-reg-write-enable-bit           = <18>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    i2c_6_apb: i2c_6_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0_div4>;
+        /* gate */
+        clk-gate-reg-offset                     = <0xB4>;
+        clk-gate-reg-bit-enable                 = <3>;
+        clk-gate-reg-write-enable-bit           = <19>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    pwm_apb: pwm_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0_div4>;
+        /* gate */
+        clk-gate-reg-offset                     = <0xB0>;
+        clk-gate-reg-bit-enable                 = <10>;
+        clk-gate-reg-write-enable-bit           = <26>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    mailbox_apb: mailbox_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0_div4>;
+        /* gate */
+        clk-gate-reg-offset                     = <0xB0>;
+        clk-gate-reg-bit-enable                 = <11>;
+        clk-gate-reg-write-enable-bit           = <27>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    vad_apb: vad_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk0_div4>;
+        /* gate */
+        clk-gate-reg-offset                     = <0xB0>;
+        clk-gate-reg-bit-enable                 = <12>;
+        clk-gate-reg-write-enable-bit           = <28>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* display system&apb clk tree
+
+      pll1_div4--------->DIV--> display system clk---->|----GATE--->dsi_apb_clk
+                                                       |----GATE--->dsi_system_clk
+                                                       |----GATE--->vo_apb_clk
+                                                       |----GATE--->twod_apb_clk
+                                                       |----GATE--->bt1120_apb_clk
+
+     1. display_sys_and_apb_clk_div             --> DIV
+     2. dsi_apb_clk_gate                        --> dsi apb clk gate
+     3. dsi_system_clk_gate                     --> dsi system clk gate
+     4. vo_apb_clk_gate                         --> video out apb clk gate
+     5. twod_apb_clk_gate
+     6. bt1120_apb_clk_gate
+    */
+
+    display_sys_apb: display_sys_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&pll1_div4>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;                                  /* min multiple*/
+        clk-rate-conf-mul-max                   = <1>;                                  /* max multiple*/
+        clk-rate-conf-div-min                   = <1>;                                  /* min divider*/
+        clk-rate-conf-div-max                   = <16>;                                 /* max divider*/
+        clk-rate-calc-method                    = <1>;                                  /* 0 for multiple can be changed, 1 for divider can be changed, 2 for div&mul can be changed */
+
+        clk-rate-reg-offset                     = <0x118>;                               /* divider register offset */
+        clk-rate-reg-mul-value-shift            = <0>;                                  /* multiple field shift. It's valid when clk-rate-calc-method = 2 */
+        clk-rate-reg-mul-value-mask             = <0>;                                  /* multiple field mask.  It's valid when clk-rate-calc-method = 2 */
+        clk-rate-reg-div-value-shift            = <4>;                                  /* divider field shift. */
+        clk-rate-reg-div-value-mask             = <0xF>;                                /* divider field mask.  */
+        clk-rate-reg-write-enable-bit           = <20>;                                 /* divider write enable register */
+    };
+
+    dsi_apb: dsi_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&display_sys_apb>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x118>;
+        clk-gate-reg-bit-enable                 = <2>;
+        clk-gate-reg-write-enable-bit           = <18>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    dsi_system: dsi_system {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&display_sys_apb>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x14c>;
+        clk-gate-reg-bit-enable                 = <8>;
+        clk-gate-reg-write-enable-bit           = <25>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    vo_apb: vo_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&display_sys_apb>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x118>;
+        clk-gate-reg-bit-enable                 = <1>;
+        clk-gate-reg-write-enable-bit           = <17>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    twod_apb: twod_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&display_sys_apb>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x118>;
+        clk-gate-reg-bit-enable                 = <0>;
+        clk-gate-reg-write-enable-bit           = <16>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    bt1120_apb: bt1120_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&display_sys_apb>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x118>;
+        clk-gate-reg-bit-enable                 = <3>;
+        clk-gate-reg-write-enable-bit           = <19>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    /* csi0/1 system clk tree
+
+      pll1_div4--------->DIV--> csi0 system clk
+      pll1_div4--------->DIV--> csi1 system clk
+
+    */
+    csi0_system: csi0_system {
+    	#clock-cells                            = <0>;
+    	compatible                              = "canaan,k510-clk-composite";
+    	clocks                                  = <&pll1_div4>;
+
+    	/* rate */
+    	clk-rate-conf-mul-min                   = <1>;
+    	clk-rate-conf-mul-max                   = <1>;
+    	clk-rate-conf-div-min                   = <1>;
+    	clk-rate-conf-div-max                   = <16>;
+    	clk-rate-calc-method                    = <1>;
+
+    	clk-rate-reg-offset                     = <0x13c>;
+    	clk-rate-reg-mul-value-shift            = <0>;
+    	clk-rate-reg-mul-value-mask             = <0>;
+    	clk-rate-reg-div-value-shift            = <0>;
+    	clk-rate-reg-div-value-mask             = <0xF>;
+    	clk-rate-reg-write-enable-bit           = <24>;
+
+    	/* gate */
+    	clk-gate-reg-offset                     = <0x13c>;
+    	clk-gate-reg-bit-enable                 = <8>;
+    	clk-gate-reg-write-enable-bit           = <25>;
+    	clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    csi1_system: csi1_system {
+    	#clock-cells                            = <0>;
+    	compatible                              = "canaan,k510-clk-composite";
+    	clocks                                  = <&pll1_div4>;
+
+    	/* rate */
+    	clk-rate-conf-mul-min                   = <1>;
+    	clk-rate-conf-mul-max                   = <1>;
+    	clk-rate-conf-div-min                   = <1>;
+    	clk-rate-conf-div-max                   = <16>;
+    	clk-rate-calc-method                    = <1>;
+
+    	clk-rate-reg-offset                     = <0x140>;
+    	clk-rate-reg-mul-value-shift            = <0>;
+    	clk-rate-reg-mul-value-mask             = <0>;
+    	clk-rate-reg-div-value-shift            = <0>;
+    	clk-rate-reg-div-value-mask             = <0xF>;
+    	clk-rate-reg-write-enable-bit           = <24>;
+
+    	/* gate */
+    	clk-gate-reg-offset                     = <0x140>;
+    	clk-gate-reg-bit-enable                 = <8>;
+    	clk-gate-reg-write-enable-bit           = <25>;
+    	clk-gate-reg-bit-reverse                = <0>;
+    };
+    /* csi0 clock tree
+                    +-+
+                    |M \         
+      pll2_div4---->|U |-->DIV-->|---GATE--->csi0_pixel_clk
+                    |X /
+                    +-+
+
+     1. csi0_pixel_clk                          --> DIV&GATE (only one parent)
+    */
+    csi0_pixel: csi0_pixel {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&pll2_div4>;                         /* only one parent */
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <128>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0x124>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <0>;
+        clk-rate-reg-div-value-mask             = <0x7F>;
+        clk-rate-reg-write-enable-bit           = <24>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x124>;
+        clk-gate-reg-bit-enable                 = <8>;
+        clk-gate-reg-write-enable-bit           = <25>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* csi1 clock tree
+                    +-+
+      pll2_div4---->|M \         
+      pll2_div3---->|U |-->DIV-->|---GATE--->csi1_pixel_clk
+      pll0     ---->|X /
+      pll1     ---->+-+
+
+     1. csi1_pixel_clk                          --> MUX&DIV&GATE
+    */
+    csi1_pixel: csi1_pixel {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+
+        /* parent */
+        clocks                                  = <&pll2_div4>, <&pll2_div3>, <&pll0>, <&pll1>;
+        clk-parent-reg-offset                   = <0x128>;
+        clk-parent-reg-value-shift              = <9>;
+        clk-parent-reg-value-mask               = <0x3>;
+        clk-parent-reg-write-enable-bit         = <26>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <128>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0x128>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <0>;
+        clk-rate-reg-div-value-mask             = <0x7F>;
+        clk-rate-reg-write-enable-bit           = <24>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x128>;
+        clk-gate-reg-bit-enable                 = <8>;
+        clk-gate-reg-write-enable-bit           = <25>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* tpg clock tree
+                    +-+
+                    |M \         
+      pll2_div4---->|U |-->DIV-->|---GATE--->tpg_pixel_clk
+                    |X /
+                    +-+
+
+     1. tpg_pixel_clk                          --> DIV&GATE (only one parent)
+    */
+    tpg_pixel: tpg_pixel {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&pll2_div4>;                         /* only one parent */
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <128>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0x120>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <0>;
+        clk-rate-reg-div-value-mask             = <0x7F>;
+        clk-rate-reg-write-enable-bit           = <24>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x120>;
+        clk-gate-reg-bit-enable                 = <8>;
+        clk-gate-reg-write-enable-bit           = <25>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* display pixel clock tree
+                    +-+
+      pll2_div4---->|M \         
+      pll2_div3---->|U |-->DIV-->|---GATE--->display_pixel_clk
+      pll0     ---->|X /
+      pll1     ---->+-+
+
+     1. display_pixel_clk                       --> MUX&DIV&GATE
+    */
+    display_pixel: display_pixel {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+
+        /* parent */
+        clocks                                  = <&pll2_div4>, <&pll2_div3>, <&pll0>, <&pll1>;
+        clk-parent-reg-offset                   = <0x134>;
+        clk-parent-reg-value-shift              = <9>;
+        clk-parent-reg-value-mask               = <0x3>;
+        clk-parent-reg-write-enable-bit         = <26>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <128>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0x134>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <0>;
+        clk-rate-reg-div-value-mask             = <0x7F>;
+        clk-rate-reg-write-enable-bit           = <24>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x134>;
+        clk-gate-reg-bit-enable                 = <8>;
+        clk-gate-reg-write-enable-bit           = <25>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* noc_clk1 tree
+      pll0_div2---->DIV-------->|----GATE--->noc_clk1_axi_mctl_p2_clk_gate
+                                |----GATE--->h264_axi_gate
+                                |
+                                |----noc_peri_apb_div-->|----GATE--->uart(0-3)_apb_gate
+                                |                       |----GATE--->i2s_s_apb_gate
+                                |                       |----GATE--->audio_apb_gate
+                                |
+                                |----noc_peri_ahb_div-->|----GATE--->spi_0-3_ahb_gate
+                                |
+                                |----GATE--->vo_axi_gate
+                                |----GATE--->twod_axi_gate
+                                |----GATE--->fbc_axi_gate
+                                |----GATE--->vi_axi_gate
+                                |----GATE--->isp_f2k_axi_gate
+                                |----GATE--->isp_r2k_axi_gate
+                                |----GATE--->isp_tof_axi_gate
+                                |
+                                |
+                                |---noc_clk1_div4-->|----GATE--->csi_0-3_apb_gate
+                                                    |----GATE--->isp_f2k_apb_gate
+                                                    |----GATE--->isp_r2k_apb_gate
+                                                    |----GATE--->isp_tof_apb_gate
+                                                    |----GATE--->fbc_apb_gate
+                                                    |----GATE--->mipi_corner_apb_gate
+                                                    |----GATE--->vi_apb_gate
+    */
+
+    noc_clk1: noc_clk1 {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&pll0_div2>;                         /* only one parent */
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <6>;
+        clk-rate-conf-div-min                   = <6>;
+        clk-rate-conf-div-max                   = <6>;
+        clk-rate-calc-method                    = <0>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0x40>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <8>;
+        clk-rate-reg-div-value-mask             = <0x7>;
+        clk-rate-reg-write-enable-bit           = <26>;
+    };
+
+    noc1_axi_mctl: noc1_axi_mctl {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk1>;                      /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x168>;
+        clk-gate-reg-bit-enable                 = <11>;
+        clk-gate-reg-write-enable-bit           = <22>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    h264_axi: h264_axi {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk1>;                      /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x150>;
+        clk-gate-reg-bit-enable                 = <0>;
+        clk-gate-reg-write-enable-bit           = <16>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    noc_peri_apb: noc_peri_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk1>;                /* only one parent */
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <4>;
+        clk-rate-conf-div-max                   = <16>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0x50>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <8>;
+        clk-rate-reg-div-value-mask             = <0xF>;
+        clk-rate-reg-write-enable-bit           = <24>;
+    };
+    uart_0_apb: uart_0_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_peri_apb>;            /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x54>;
+        clk-gate-reg-bit-enable                 = <0>;
+        clk-gate-reg-write-enable-bit           = <16>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    uart_1_apb: uart_1_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_peri_apb>;            /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x54>;
+        clk-gate-reg-bit-enable                 = <1>;
+        clk-gate-reg-write-enable-bit           = <17>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    uart_2_apb: uart_2_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_peri_apb>;            /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x54>;
+        clk-gate-reg-bit-enable                 = <2>;
+        clk-gate-reg-write-enable-bit           = <18>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    uart_3_apb: uart_3_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_peri_apb>;            /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x54>;
+        clk-gate-reg-bit-enable                 = <3>;
+        clk-gate-reg-write-enable-bit           = <19>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    i2s_s_apb: i2s_s_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_peri_apb>;            /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x54>;
+        clk-gate-reg-bit-enable                 = <5>;
+        clk-gate-reg-write-enable-bit           = <21>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    audio_apb: audio_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_peri_apb>;            /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x54>;
+        clk-gate-reg-bit-enable                 = <10>;
+        clk-gate-reg-write-enable-bit           = <26>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    noc_peri_ahb: noc_peri_ahb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk1>;                /* only one parent */
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <2>;
+        clk-rate-conf-div-max                   = <8>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0x50>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <4>;
+        clk-rate-reg-div-value-mask             = <0x7>;
+        clk-rate-reg-write-enable-bit           = <25>;
+    };
+    spi_0_ahb: spi_0_ahb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_peri_ahb>;            /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x54>;
+        clk-gate-reg-bit-enable                 = <6>;
+        clk-gate-reg-write-enable-bit           = <22>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    spi_1_ahb: spi_1_ahb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_peri_ahb>;            /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x54>;
+        clk-gate-reg-bit-enable                 = <7>;
+        clk-gate-reg-write-enable-bit           = <23>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    spi_2_ahb: spi_2_ahb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_peri_ahb>;            /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x54>;
+        clk-gate-reg-bit-enable                 = <8>;
+        clk-gate-reg-write-enable-bit           = <24>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    spi_3_ahb: spi_3_ahb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_peri_ahb>;            /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x54>;
+        clk-gate-reg-bit-enable                 = <9>;
+        clk-gate-reg-write-enable-bit           = <25>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    vo_axi: vo_axi {
+        #clock-cells                            = <0>;                                 /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk1>;                      /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x11c>;
+        clk-gate-reg-bit-enable                 = <1>;
+        clk-gate-reg-write-enable-bit           = <17>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    twod_axi: twod_axi {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk1>;                      /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x11c>;
+        clk-gate-reg-bit-enable                 = <0>;
+        clk-gate-reg-write-enable-bit           = <16>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    fbc_axi: fbc_axi {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk1>;                      /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x114>;
+        clk-gate-reg-bit-enable                 = <5>;
+        clk-gate-reg-write-enable-bit           = <21>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    vi_axi: vi_axi {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk1>;                      /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x114>;
+        clk-gate-reg-bit-enable                 = <4>;
+        clk-gate-reg-write-enable-bit           = <20>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    isp_f2k_axi: isp_f2k_axi {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk1>;                      /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x114>;
+        clk-gate-reg-bit-enable                 = <1>;
+        clk-gate-reg-write-enable-bit           = <17>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    isp_r2k_axi: isp_r2k_axi {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk1>;                      /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x114>;
+        clk-gate-reg-bit-enable                 = <2>;
+        clk-gate-reg-write-enable-bit           = <18>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    isp_tof_axi: isp_tof_axi {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk1>;                      /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x114>;
+        clk-gate-reg-bit-enable                 = <3>;
+        clk-gate-reg-write-enable-bit           = <19>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+
+    noc_clk1_div4: noc_clk1_div4 {
+        #clock-cells                            = <0>;
+        compatible                              = "fixed-factor-clock";
+        clocks                                  = <&noc_clk1>;
+        clock-div                               = <4>;
+        clock-mult                              = <1>;
+    };
+    csi0_apb: csi0_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk1_div4>;                     /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x110>;
+        clk-gate-reg-bit-enable                 = <4>;
+        clk-gate-reg-write-enable-bit           = <20>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    csi1_apb: csi1_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk1_div4>;                     /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x110>;
+        clk-gate-reg-bit-enable                 = <5>;
+        clk-gate-reg-write-enable-bit           = <21>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    csi2_apb: csi2_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk1_div4>;                     /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x110>;
+        clk-gate-reg-bit-enable                 = <6>;
+        clk-gate-reg-write-enable-bit           = <22>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    csi3_apb: csi3_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk1_div4>;                     /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x110>;
+        clk-gate-reg-bit-enable                 = <7>;
+        clk-gate-reg-write-enable-bit           = <23>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    isp_f2k_apb: isp_f2k_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk1_div4>;                      /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x110>;
+        clk-gate-reg-bit-enable                 = <1>;
+        clk-gate-reg-write-enable-bit           = <17>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    isp_r2k_apb: isp_r2k_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk1_div4>;                      /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x110>;
+        clk-gate-reg-bit-enable                 = <2>;
+        clk-gate-reg-write-enable-bit           = <18>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    isp_tof_apb: isp_tof_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk1_div4>;                      /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x110>;
+        clk-gate-reg-bit-enable                 = <3>;
+        clk-gate-reg-write-enable-bit           = <19>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    fbc_apb: fbc_apb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk1_div4>;                      /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x110>;
+        clk-gate-reg-bit-enable                 = <10>;
+        clk-gate-reg-write-enable-bit           = <26>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    mipi_corner: mipi_corner {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&noc_clk1_div4>;                      /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x15c>;
+        clk-gate-reg-bit-enable                 = <1>;
+        clk-gate-reg-write-enable-bit           = <17>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    vi_apb: vi_apb {
+    	#clock-cells                            = <0>;                                  /* only one output */
+    	compatible                              = "canaan,k510-clk-composite";
+    	clocks                                  = <&noc_clk1_div4>;                      /* only one parent */
+
+    	/* gate */
+    	clk-gate-reg-offset                     = <0x110>;
+    	clk-gate-reg-bit-enable                 = <8>;
+    	clk-gate-reg-write-enable-bit           = <24>;
+    	clk-gate-reg-bit-reverse                = <0>;
+    };
+    /* audio out serial clock tree
+      pll1_div3---->DIV---->GATE--->----INVERT--->audio clk out
+    */
+    audio_o_serial: audio_o_serial {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&pll0>;                              /* only one parent */
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <0xFF>;
+        clk-rate-conf-div-min                   = <0x10>;
+        clk-rate-conf-div-max                   = <0xFFF>;
+        clk-rate-calc-method                    = <2>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0x88>;
+        clk-rate-reg-mul-value-shift            = <12>;
+        clk-rate-reg-mul-value-mask             = <0xFF>;
+        clk-rate-reg-div-value-shift            = <0>;
+        clk-rate-reg-div-value-mask             = <0xFFF>;
+        clk-rate-reg-write-enable-bit           = <24>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x88>;                               /* gate whole security system ahb clk */
+        clk-gate-reg-bit-enable                 = <20>;
+        clk-gate-reg-write-enable-bit           = <25>;
+        clk-gate-reg-bit-reverse                = <0>;
+
+        /* phase */
+        clk-phase-invert-reg-offset             = <0x88>;
+        clk-phase-invert-reg-bit                = <21>;
+        clk-phase-invert-reg-write-enable-bit   = <26>;
+    };
+
+    /* audio in serial clock tree
+      pll1_div3---->DIV---->GATE--->----INVERT--->audio clk in
+    */
+    audio_i_serial: audio_i_serial {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&pll0>;                              /* only one parent */
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <0xFF>;
+        clk-rate-conf-div-min                   = <0x10>;
+        clk-rate-conf-div-max                   = <0xFFF>;
+        clk-rate-calc-method                    = <2>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0x8C>;
+        clk-rate-reg-mul-value-shift            = <12>;
+        clk-rate-reg-mul-value-mask             = <0xFF>;
+        clk-rate-reg-div-value-shift            = <0>;
+        clk-rate-reg-div-value-mask             = <0xFFF>;
+        clk-rate-reg-write-enable-bit           = <24>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x8C>;
+        clk-gate-reg-bit-enable                 = <20>;
+        clk-gate-reg-write-enable-bit           = <25>;
+        clk-gate-reg-bit-reverse                = <0>;
+
+        /* phase */
+        clk-phase-invert-reg-offset             = <0x8C>;
+        clk-phase-invert-reg-bit                = <21>;
+        clk-phase-invert-reg-write-enable-bit   = <26>;
+    };
+
+    /* sd master clk fixed div 5 
+       pll0 --> fixed div 5--> sd master clk --> gate --> sd_0_master_clk
+                                             --> gate --> sd_1_master_clk
+                                             --> gate --> sd_2_master_clk
+    */
+    sd_master: sd_master {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "fixed-factor-clock";                 /* match fixed-factor-clock driver */
+        clocks                                  = <&pll0>;                              /* come from pll0 1G */
+        clock-div                               = <5>;                                  /* div 5 */
+        clock-mult                              = <1>;
+    };
+    sd_0_master: sd_0_master {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&sd_master>;
+        clk-gate-reg-offset                     = <0x108>;                               /* gate*/
+        clk-gate-reg-bit-enable                 = <0>;
+        clk-gate-reg-write-enable-bit           = <24>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    sd_1_master: sd_1_master {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&sd_master>;
+        clk-gate-reg-offset                     = <0x108>;                               /* gate*/
+        clk-gate-reg-bit-enable                 = <4>;
+        clk-gate-reg-write-enable-bit           = <25>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    sd_2_master: sd_2_master {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&sd_master>;
+        clk-gate-reg-offset                     = <0x108>;                               /* gate*/
+        clk-gate-reg-bit-enable                 = <8>;
+        clk-gate-reg-write-enable-bit           = <26>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* mipi clock tree 
+                    +-+
+      pll2_div2---->|M \
+      pll1     ---->|U |-->DIV-->|--->GATE--->txphy_ref_clock
+                    |X /         |--->GATE--->rxphy_ref_clock
+                    +-+
+
+     osc25m_gate--------------------->GATE--->txphy_pll_clock
+   */
+    mipi_ref: mipi_ref {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&pll2_div2> , <&pll1>;
+
+        clk-parent-reg-offset                   = <0x158>;
+        clk-parent-reg-value-shift              = <2>;
+        clk-parent-reg-value-mask               = <0x1>;
+        clk-parent-reg-write-enable-bit         = <18>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <16>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0x158>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <4>;
+        clk-rate-reg-div-value-mask             = <0xF>;
+        clk-rate-reg-write-enable-bit           = <19>;
+    };
+
+    mipi_txphy_ref: mipi_txphy_ref {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&mipi_ref>;
+        clk-gate-reg-offset                     = <0x158>;
+
+        /* gate*/
+        clk-gate-reg-bit-enable                 = <1>;
+        clk-gate-reg-write-enable-bit           = <17>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    mipi_rxphy_ref: mipi_rxphy_ref {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&mipi_ref>;
+        
+        /* gate*/
+        clk-gate-reg-offset                     = <0x15c>;
+        clk-gate-reg-bit-enable                 = <0>;
+        clk-gate-reg-write-enable-bit           = <16>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+     mipi_txphy_pll: mipi_txphy_pll {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&osc25m_gate>;
+        
+        /* gate*/
+        clk-gate-reg-offset                     = <0x158>;
+        clk-gate-reg-bit-enable                 = <0>;
+        clk-gate-reg-write-enable-bit           = <16>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* security ahb (for config) clock tree
+      pll1_div3---->DIV---->GATE--->|----GATE--->otp_ahb
+                                    |----GATE--->rom_ahb
+                                    |----GATE--->sha_ahb
+                                    |----GATE--->aes_ahb
+                                    |----GATE--->puf_ahb
+    */
+    sec_ahb: sec_ahb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&pll1_div3>;                         /* only one parent */
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <8>;
+        clk-rate-conf-div-min                   = <8>;
+        clk-rate-conf-div-max                   = <8>;
+        clk-rate-calc-method                    = <0>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0x90>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <0>;
+        clk-rate-reg-div-value-mask             = <0x7>;
+        clk-rate-reg-write-enable-bit           = <24>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x94>;                               /* gate whole security system ahb clk */
+        clk-gate-reg-bit-enable                 = <6>;
+        clk-gate-reg-write-enable-bit           = <22>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    sha_ahb: sha_ahb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&sec_ahb>;                           /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x94>;
+        clk-gate-reg-bit-enable                 = <0>;
+        clk-gate-reg-write-enable-bit           = <16>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    aes_ahb: aes_ahb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&sec_ahb>;                           /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x94>;
+        clk-gate-reg-bit-enable                 = <1>;
+        clk-gate-reg-write-enable-bit           = <17>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    rom_ahb: rom_ahb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&sec_ahb>;                           /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x94>;
+        clk-gate-reg-bit-enable                 = <3>;
+        clk-gate-reg-write-enable-bit           = <19>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    otp_ahb: otp_ahb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&sec_ahb>;                           /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x94>;
+        clk-gate-reg-bit-enable                 = <4>;
+        clk-gate-reg-write-enable-bit           = <20>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    puf_ahb: puf_ahb {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&sec_ahb>;                           /* only one parent */
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x94>;
+        clk-gate-reg-bit-enable                 = <5>;
+        clk-gate-reg-write-enable-bit           = <21>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* ddr controller core clock tree
+                    +-+
+      pll1--------->|M \         
+      pll2_div2---->|U |-->DIV-->|---GATE--->mctl_ddrc_clk
+      pll3_div3---->|X /
+      pll3_div4---->+-+
+    */
+    mctl_ddrc: mctl_ddrc {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+
+        /* parent */
+        clocks                                  = <&pll1>, <&pll2_div2>, <&pll3_div3>, <&pll3_div2>;
+        clk-parent-reg-offset                   = <0x168>;
+        clk-parent-reg-value-shift              = <0>;
+        clk-parent-reg-value-mask               = <0x3>;
+        clk-parent-reg-write-enable-bit         = <16>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <2>;
+        clk-rate-conf-div-max                   = <4>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0x168>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <4>;
+        clk-rate-reg-div-value-mask             = <0x3>;
+        clk-rate-reg-write-enable-bit           = <17>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x168>;
+        clk-gate-reg-bit-enable                 = <8>;
+        clk-gate-reg-write-enable-bit           = <19>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* emac loopback clk tree
+       pll0_div4 --> DIV--> gate --> emac_loopback
+    */
+
+    emac_loopback: emac_loopback {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&pll0_div4>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <2>;
+        clk-rate-conf-div-max                   = <128>;
+        clk-rate-calc-method                    = <1>;
+
+        clk-rate-reg-offset                     = <0x104>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <10>;
+        clk-rate-reg-div-value-mask             = <0x3F>;
+        clk-rate-reg-write-enable-bit           = <31>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x104>;
+        clk-gate-reg-bit-enable                 = <3>;
+        clk-gate-reg-write-enable-bit           = <24>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* uart0 system clock tree
+                    +-+
+      osc25m_gate-->|M \         
+      pll1_div4---->|U |-->DIV-->|---GATE--->uart_0_system_clock
+                    |X /
+                    +-+
+    */
+    uart_0_sclk: uart_0_sclk {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+
+        /* parent */
+        clocks                                  = <&osc25m_gate>, <&pll1_div4>;
+        clk-parent-reg-offset                   = <0x5c>;
+        clk-parent-reg-value-shift              = <0>;
+        clk-parent-reg-value-mask               = <0x1>;
+        clk-parent-reg-write-enable-bit         = <24>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <32>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0x5c>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <4>;
+        clk-rate-reg-div-value-mask             = <0x1F>;
+        clk-rate-reg-write-enable-bit           = <25>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x5c>;
+        clk-gate-reg-bit-enable                 = <12>;
+        clk-gate-reg-write-enable-bit           = <26>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* uart1 system clock tree
+                    +-+
+      osc25m_gate-->|M \         
+      pll1_div4---->|U |-->DIV-->|---GATE--->uart_1_system_clock
+                    |X /
+                    +-+
+    */
+    uart_1_sclk: uart_1_sclk {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+
+        /* parent */
+        clocks                                  = <&osc25m_gate>, <&pll1_div4>;
+        clk-parent-reg-offset                   = <0x60>;
+        clk-parent-reg-value-shift              = <0>;
+        clk-parent-reg-value-mask               = <0x1>;
+        clk-parent-reg-write-enable-bit         = <24>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <32>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0x60>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <4>;
+        clk-rate-reg-div-value-mask             = <0x1F>;
+        clk-rate-reg-write-enable-bit           = <25>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x60>;
+        clk-gate-reg-bit-enable                 = <12>;
+        clk-gate-reg-write-enable-bit           = <26>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* uart2 system clock tree
+                    +-+
+      osc25m_gate-->|M \         
+      pll1_div4---->|U |-->DIV-->|---GATE--->uart_2_system_clock
+                    |X /
+                    +-+
+    */
+    uart_2_sclk: uart_2_sclk {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+
+        /* parent */
+        clocks                                  = <&osc25m_gate>, <&pll1_div4>;
+        clk-parent-reg-offset                   = <0x64>;
+        clk-parent-reg-value-shift              = <0>;
+        clk-parent-reg-value-mask               = <0x1>;
+        clk-parent-reg-write-enable-bit         = <24>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <32>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0x64>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <4>;
+        clk-rate-reg-div-value-mask             = <0x1F>;
+        clk-rate-reg-write-enable-bit           = <25>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x64>;
+        clk-gate-reg-bit-enable                 = <12>;
+        clk-gate-reg-write-enable-bit           = <26>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* uart3 system clock tree
+                    +-+
+      osc25m_gate-->|M \         
+      pll1_div4---->|U |-->DIV-->|---GATE--->uart_3_system_clock
+                    |X /
+                    +-+
+    */
+    uart_3_sclk: uart_3_sclk {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+
+        /* parent */
+        clocks                                  = <&osc25m_gate>, <&pll1_div4>;
+        clk-parent-reg-offset                   = <0x68>;
+        clk-parent-reg-value-shift              = <0>;
+        clk-parent-reg-value-mask               = <0x1>;
+        clk-parent-reg-write-enable-bit         = <24>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <32>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0x68>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <4>;
+        clk-rate-reg-div-value-mask             = <0x1F>;
+        clk-rate-reg-write-enable-bit           = <25>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x68>;
+        clk-gate-reg-bit-enable                 = <12>;
+        clk-gate-reg-write-enable-bit           = <26>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* spi0 system clock tree
+                    +-+
+      osc25m_gate-->|M \         
+      pll0       -->|U |-->DIV-->|---GATE--->spi_0_system_clock
+                    |X /
+                    +-+
+    */
+    spi_0_system: spi_0_system {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+
+        /* parent */
+        clocks                                  = <&osc25m_gate>, <&pll0>;
+        clk-parent-reg-offset                   = <0x74>;
+        clk-parent-reg-value-shift              = <0>;
+        clk-parent-reg-value-mask               = <0x1>;
+        clk-parent-reg-write-enable-bit         = <24>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <16>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0x74>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <4>;
+        clk-rate-reg-div-value-mask             = <0xF>;
+        clk-rate-reg-write-enable-bit           = <25>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x74>;
+        clk-gate-reg-bit-enable                 = <8>;
+        clk-gate-reg-write-enable-bit           = <26>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* spi1 system clock tree
+                    +-+
+      osc25m_gate-->|M \         
+      pll0       -->|U |-->DIV-->|---GATE--->spi_1_system_clock
+                    |X /
+                    +-+
+    */
+    spi_1_system: spi_1_system {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+
+        /* parent */
+        clocks                                  = <&osc25m_gate>, <&pll0>;
+        clk-parent-reg-offset                   = <0x78>;
+        clk-parent-reg-value-shift              = <0>;
+        clk-parent-reg-value-mask               = <0x1>;
+        clk-parent-reg-write-enable-bit         = <24>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <16>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0x78>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <4>;
+        clk-rate-reg-div-value-mask             = <0xF>;
+        clk-rate-reg-write-enable-bit           = <25>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x78>;
+        clk-gate-reg-bit-enable                 = <8>;
+        clk-gate-reg-write-enable-bit           = <26>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* spi2 system clock tree
+                    +-+
+      osc25m_gate-->|M \         
+      pll0       -->|U |-->DIV-->|---GATE--->spi_2_system_clock
+                    |X /
+                    +-+
+    */
+    spi_2_system: spi_2_system {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+
+        /* parent */
+        clocks                                  = <&osc25m_gate>, <&pll0>;
+        clk-parent-reg-offset                   = <0x7c>;
+        clk-parent-reg-value-shift              = <0>;
+        clk-parent-reg-value-mask               = <0x1>;
+        clk-parent-reg-write-enable-bit         = <24>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <16>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0x7c>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <4>;
+        clk-rate-reg-div-value-mask             = <0xF>;
+        clk-rate-reg-write-enable-bit           = <25>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x7c>;
+        clk-gate-reg-bit-enable                 = <8>;
+        clk-gate-reg-write-enable-bit           = <26>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* spi3 system clock tree
+       osc25m_gate----> DIV ----> GATE --->spi_3_system_clock
+    */
+
+    spi_3_system: spi_3_system {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+        /* parent */
+        clocks                                  = <&osc25m_gate>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <16>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0x80>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <4>;
+        clk-rate-reg-div-value-mask             = <0xF>;
+        clk-rate-reg-write-enable-bit           = <24>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x80>;
+        clk-gate-reg-bit-enable                 = <8>;
+        clk-gate-reg-write-enable-bit           = <25>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* otp system clock tree
+       osc25m_gate----> fixed div(2) ----> GATE --->otp_system_clock
+    */
+    otp_sys_src: otp_sys_src {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "fixed-factor-clock";                 /* match fixed-factor-clock driver */
+        clocks                                  = <&osc25m_gate>;                       /* come from 25m osc */
+        clock-div                               = <2>;                                  /* div 8 */
+        clock-mult                              = <1>;
+    };
+    otp_system: otp_system {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+        /* parent */
+        clocks                                  = <&otp_sys_src>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x98>;
+        clk-gate-reg-bit-enable                 = <0>;
+        clk-gate-reg-write-enable-bit           = <16>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* i2c0 sclk tree 
+                    +-+
+      pll0_div4  -->|M \
+      osc25m_gate-->|U |-->DIV-->|---GATE--->i2c_0_sclk
+                    |X /
+                    +-+
+    */
+    i2c_0_system: i2c_0_system {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+        /* parent */
+        clocks                                  = <&pll0_div4> , <&osc25m_gate>; 
+        clk-parent-reg-offset                   = <0xb8>;
+        clk-parent-reg-value-shift              = <9>;
+        clk-parent-reg-value-mask               = <0x1>;
+        clk-parent-reg-write-enable-bit         = <26>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <64>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0xb8>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <0>;
+        clk-rate-reg-div-value-mask             = <0x3F>;
+        clk-rate-reg-write-enable-bit           = <24>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0xb8>;
+        clk-gate-reg-bit-enable                 = <8>;
+        clk-gate-reg-write-enable-bit           = <25>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* i2c1 sclk tree 
+                    +-+
+      pll0_div4  -->|M \
+      osc25m_gate-->|U |-->DIV-->|---GATE--->i2c_1_sclk
+                    |X /
+                    +-+
+    */
+    i2c_1_system: i2c_1_system {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+        /* parent */
+        clocks                                  = <&pll0_div4> , <&osc25m_gate>; 
+        clk-parent-reg-offset                   = <0xbc>;
+        clk-parent-reg-value-shift              = <9>;
+        clk-parent-reg-value-mask               = <0x1>;
+        clk-parent-reg-write-enable-bit         = <26>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <64>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0xbc>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <0>;
+        clk-rate-reg-div-value-mask             = <0x3F>;
+        clk-rate-reg-write-enable-bit           = <24>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0xbc>;
+        clk-gate-reg-bit-enable                 = <8>;
+        clk-gate-reg-write-enable-bit           = <25>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* i2c2 sclk tree 
+                    +-+
+      pll0_div4  -->|M \
+      osc25m_gate-->|U |-->DIV-->|---GATE--->i2c_2_sclk
+                    |X /
+                    +-+
+    */
+    i2c_2_system: i2c_2_system {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+        /* parent */
+        clocks                                  = <&pll0_div4> , <&osc25m_gate>; 
+        clk-parent-reg-offset                   = <0xc0>;
+        clk-parent-reg-value-shift              = <9>;
+        clk-parent-reg-value-mask               = <0x1>;
+        clk-parent-reg-write-enable-bit         = <26>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <64>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0xc0>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <0>;
+        clk-rate-reg-div-value-mask             = <0x3F>;
+        clk-rate-reg-write-enable-bit           = <24>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0xc0>;
+        clk-gate-reg-bit-enable                 = <8>;
+        clk-gate-reg-write-enable-bit           = <25>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* i2c3 sclk tree 
+                    +-+
+      pll0_div4  -->|M \
+      osc25m_gate-->|U |-->DIV-->|---GATE--->i2c_3_sclk
+                    |X /
+                    +-+
+    */
+    i2c_3_system: i2c_3_system {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+        /* parent */
+        clocks                                  = <&pll0_div4> , <&osc25m_gate>; 
+        clk-parent-reg-offset                   = <0xc4>;
+        clk-parent-reg-value-shift              = <9>;
+        clk-parent-reg-value-mask               = <0x1>;
+        clk-parent-reg-write-enable-bit         = <26>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <64>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0xc4>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <0>;
+        clk-rate-reg-div-value-mask             = <0x3F>;
+        clk-rate-reg-write-enable-bit           = <24>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0xc4>;
+        clk-gate-reg-bit-enable                 = <8>;
+        clk-gate-reg-write-enable-bit           = <25>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* i2c4 sclk tree 
+                    +-+
+      pll0_div4  -->|M \
+      osc25m_gate-->|U |-->DIV-->|---GATE--->i2c_4_sclk
+                    |X /
+                    +-+
+    */
+    i2c_4_system: i2c_4_system {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+        /* parent */
+        clocks                                  = <&pll0_div4> , <&osc25m_gate>; 
+        clk-parent-reg-offset                   = <0xc8>;
+        clk-parent-reg-value-shift              = <9>;
+        clk-parent-reg-value-mask               = <0x1>;
+        clk-parent-reg-write-enable-bit         = <26>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <64>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0xc8>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <0>;
+        clk-rate-reg-div-value-mask             = <0x3F>;
+        clk-rate-reg-write-enable-bit           = <24>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0xc8>;
+        clk-gate-reg-bit-enable                 = <8>;
+        clk-gate-reg-write-enable-bit           = <25>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* i2c5 sclk tree 
+                    +-+
+      pll0_div4  -->|M \
+      osc25m_gate-->|U |-->DIV-->|---GATE--->i2c_5_sclk
+                    |X /
+                    +-+
+    */
+    i2c_5_system: i2c_5_system {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+        /* parent */
+        clocks                                  = <&pll0_div4> , <&osc25m_gate>; 
+        clk-parent-reg-offset                   = <0xcc>;
+        clk-parent-reg-value-shift              = <9>;
+        clk-parent-reg-value-mask               = <0x1>;
+        clk-parent-reg-write-enable-bit         = <26>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <64>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0xcc>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <0>;
+        clk-rate-reg-div-value-mask             = <0x3F>;
+        clk-rate-reg-write-enable-bit           = <24>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0xcc>;
+        clk-gate-reg-bit-enable                 = <8>;
+        clk-gate-reg-write-enable-bit           = <25>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* i2c6 sclk tree 
+                    +-+
+      pll0_div4  -->|M \
+      osc25m_gate-->|U |-->DIV-->|---GATE--->i2c_6_sclk
+                    |X /
+                    +-+
+    */
+    i2c_6_system: i2c_6_system {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+        /* parent */
+        clocks                                  = <&pll0_div4> , <&osc25m_gate>; 
+        clk-parent-reg-offset                   = <0xd0>;
+        clk-parent-reg-value-shift              = <9>;
+        clk-parent-reg-value-mask               = <0x1>;
+        clk-parent-reg-write-enable-bit         = <26>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <64>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0xd0>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <0>;
+        clk-rate-reg-div-value-mask             = <0x3F>;
+        clk-rate-reg-write-enable-bit           = <24>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0xd0>;
+        clk-gate-reg-bit-enable                 = <8>;
+        clk-gate-reg-write-enable-bit           = <25>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* wdt0 sclk tree 
+      osc25m_gate--------->DIV----->GATE--->wdt_0_sclk
+    */
+    wdt_0_tick: wdt_0_tick {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+        /* parent */
+        clocks                                  = <&osc25m_gate>; 
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <64>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0xd4>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <0>;
+        clk-rate-reg-div-value-mask             = <0x3F>;
+        clk-rate-reg-write-enable-bit           = <24>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0xd4>;
+        clk-gate-reg-bit-enable                 = <8>;
+        clk-gate-reg-write-enable-bit           = <25>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* wdt1 sclk tree 
+      osc25m_gate--------->DIV----->GATE--->wdt_1_sclk
+    */
+    wdt_1_tick: wdt_1_tick {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+        /* parent */
+        clocks                                  = <&osc25m_gate>; 
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <64>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0xd8>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <0>;
+        clk-rate-reg-div-value-mask             = <0x3F>;
+        clk-rate-reg-write-enable-bit           = <24>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0xd8>;
+        clk-gate-reg-bit-enable                 = <8>;
+        clk-gate-reg-write-enable-bit           = <25>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* wdt2 sclk tree 
+      osc25m_gate--------->DIV----->GATE--->wdt_2_sclk
+    */
+    wdt_2_tick: wdt_2_tick {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+        /* parent */
+        clocks                                  = <&osc25m_gate>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <64>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0xdc>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <0>;
+        clk-rate-reg-div-value-mask             = <0x3F>;
+        clk-rate-reg-write-enable-bit           = <24>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0xdc>;
+        clk-gate-reg-bit-enable                 = <8>;
+        clk-gate-reg-write-enable-bit           = <25>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* vad sclk tree
+       osc25m_gate------>DIV------>GATE----->vad seiral(sample) clock ----> phase(invert or not)---> vad sclk
+    */
+    vad_system: vad_system {
+        #clock-cells                            = <0>;                                  /* only one output */
+        compatible                              = "canaan,k510-clk-composite";
+        clocks                                  = <&osc25m_gate>;                       /* only one parent */
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <0x3F>;
+        clk-rate-conf-div-min                   = <0x20>;
+        clk-rate-conf-div-max                   = <0xFFF>;
+        clk-rate-calc-method                    = <2>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0xEC>;
+        clk-rate-reg-mul-value-shift            = <12>;
+        clk-rate-reg-mul-value-mask             = <0x3F>;
+        clk-rate-reg-div-value-shift            = <0>;
+        clk-rate-reg-div-value-mask             = <0xFFF>;
+        clk-rate-reg-write-enable-bit           = <24>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0xEC>;
+        clk-gate-reg-bit-enable                 = <18>;
+        clk-gate-reg-write-enable-bit           = <25>;
+        clk-gate-reg-bit-reverse                = <0>;
+
+        /* phase */
+        clk-phase-invert-reg-offset             = <0xEC>;
+        clk-phase-invert-reg-bit                = <20>;
+        clk-phase-invert-reg-write-enable-bit   = <27>;
+    };
+
+    /* timer x system clock tree 
+                    +-+
+      osc25m_gate-->|M \
+      osc32k     -->|U |--->DIV-->|---GATE(all timer)--->timer_x_tick_clk(system clock)
+                    |X /
+                    +-+
+    */
+    timer_0_tick: timer_0_tick {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+        /* parent */
+        clocks                                  = <&osc32k> , <&osc25m_gate>; 
+        clk-parent-reg-offset                   = <0xe0>;
+        clk-parent-reg-value-shift              = <0>;
+        clk-parent-reg-value-mask               = <0x3>;
+        clk-parent-reg-write-enable-bit         = <24>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <64>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0xe4>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <0>;
+        clk-rate-reg-div-value-mask             = <0x3F>;
+        clk-rate-reg-write-enable-bit           = <25>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0xe4>;
+        clk-gate-reg-bit-enable                 = <24>;
+        clk-gate-reg-write-enable-bit           = <29>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    timer_1_tick: timer_1_tick {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+        /* parent */
+        clocks                                  = <&osc32k> , <&osc25m_gate>; 
+        clk-parent-reg-offset                   = <0xe0>;
+        clk-parent-reg-value-shift              = <4>;
+        clk-parent-reg-value-mask               = <0x3>;
+        clk-parent-reg-write-enable-bit         = <25>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <64>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0xe4>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <6>;
+        clk-rate-reg-div-value-mask             = <0x3F>;
+        clk-rate-reg-write-enable-bit           = <26>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0xe4>;
+        clk-gate-reg-bit-enable                 = <24>;
+        clk-gate-reg-write-enable-bit           = <29>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    timer_2_tick: timer_2_tick {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+        /* parent */
+        clocks                                  = <&osc32k> , <&osc25m_gate>; 
+        clk-parent-reg-offset                   = <0xe0>;
+        clk-parent-reg-value-shift              = <8>;
+        clk-parent-reg-value-mask               = <0x3>;
+        clk-parent-reg-write-enable-bit         = <26>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <64>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0xe4>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <12>;
+        clk-rate-reg-div-value-mask             = <0x3F>;
+        clk-rate-reg-write-enable-bit           = <27>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0xe4>;
+        clk-gate-reg-bit-enable                 = <24>;
+        clk-gate-reg-write-enable-bit           = <29>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    timer_3_tick: timer_3_tick {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+        /* parent */
+        clocks                                  = <&osc32k> , <&osc25m_gate>; 
+        clk-parent-reg-offset                   = <0xe0>;
+        clk-parent-reg-value-shift              = <12>;
+        clk-parent-reg-value-mask               = <0x3>;
+        clk-parent-reg-write-enable-bit         = <27>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <64>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0xe4>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <18>;
+        clk-rate-reg-div-value-mask             = <0x3F>;
+        clk-rate-reg-write-enable-bit           = <28>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0xe4>;
+        clk-gate-reg-bit-enable                 = <24>;
+        clk-gate-reg-write-enable-bit           = <29>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    timer_4_tick: timer_4_tick {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+        /* parent */
+        clocks                                  = <&osc32k> , <&osc25m_gate>; 
+        clk-parent-reg-offset                   = <0xe0>;
+        clk-parent-reg-value-shift              = <16>;
+        clk-parent-reg-value-mask               = <0x3>;
+        clk-parent-reg-write-enable-bit         = <28>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <64>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0xe8>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <0>;
+        clk-rate-reg-div-value-mask             = <0x3F>;
+        clk-rate-reg-write-enable-bit           = <24>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0xe4>;
+        clk-gate-reg-bit-enable                 = <24>;
+        clk-gate-reg-write-enable-bit           = <29>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    timer_5_tick: timer_5_tick {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+        /* parent */
+        clocks                                  = <&osc32k> , <&osc25m_gate>; 
+        clk-parent-reg-offset                   = <0xe0>;
+        clk-parent-reg-value-shift              = <20>;
+        clk-parent-reg-value-mask               = <0x3>;
+        clk-parent-reg-write-enable-bit         = <29>;
+
+        /* rate */
+        clk-rate-conf-mul-min                   = <1>;
+        clk-rate-conf-mul-max                   = <1>;
+        clk-rate-conf-div-min                   = <1>;
+        clk-rate-conf-div-max                   = <64>;
+        clk-rate-calc-method                    = <1>;                                  /* 0 for mul changeabled, 1 for div changeabled, 2 for div&mul changeable */
+
+        clk-rate-reg-offset                     = <0xe8>;
+        clk-rate-reg-mul-value-shift            = <0>;
+        clk-rate-reg-mul-value-mask             = <0>;
+        clk-rate-reg-div-value-shift            = <6>;
+        clk-rate-reg-div-value-mask             = <0x3F>;
+        clk-rate-reg-write-enable-bit           = <25>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0xe4>;
+        clk-gate-reg-bit-enable                 = <24>;
+        clk-gate-reg-write-enable-bit           = <29>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* usb clock tree 
+        osc25m_gate---->|--->GATE----->usb phy core clk
+
+        osc32k          |--->GATE----->usb wakeup clk
+    */
+    usb_phy_core:usb_phy_core {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+        /* parent */
+        clocks                                  = <&osc25m_gate>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x154>;
+        clk-gate-reg-bit-enable                 = <2>;
+        clk-gate-reg-write-enable-bit           = <18>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+    usb_wakeup: usb_wakeup {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+        /* parent */
+        clocks                                  = <&osc32k>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x154>;
+        clk-gate-reg-bit-enable                 = <1>;
+        clk-gate-reg-write-enable-bit           = <17>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    /* i2c2axi clock tree*/
+    i2c2axi: i2c2axi {
+        #clock-cells                            = <0>;
+        compatible                              = "canaan,k510-clk-composite";
+        /* parent */
+        clocks                                  = <&osc25m_gate>;
+
+        /* gate */
+        clk-gate-reg-offset                     = <0x3c>;
+        clk-gate-reg-bit-enable                 = <0>;
+        clk-gate-reg-write-enable-bit           = <24>;
+        clk-gate-reg-bit-reverse                = <0>;
+    };
+
+    emac_refclk: emac_refclk {
+        status = "okay";
+        #clock-cells = <0>;
+        compatible = "fixed-clock";
+        clock-frequency = <50000000>;
+    };
+
+};

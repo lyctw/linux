@@ -436,6 +436,20 @@ config HW_RANDOM_EXYNOS
 	  will be called exynos-trng.
 
 	  If unsure, say Y.
+
+config HW_RANDOM_K510
+	tristate "Canaan K510 True Random Number Generator support"
+	depends on HW_RANDOM || ARCH_RV64I
+	default HW_RANDOM
+	---help---
+	  This driver provides support for the True Random Number
+	  Generator available in K510 SOC.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called k510-rng.
+
+	  If unsure, say Y.
+
 endif # HW_RANDOM
 
 config UML_RANDOM

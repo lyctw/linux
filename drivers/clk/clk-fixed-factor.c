@@ -239,5 +239,11 @@ static struct platform_driver of_fixed_factor_clk_driver = {
 	.probe = of_fixed_factor_clk_probe,
 	.remove = of_fixed_factor_clk_remove,
 };
-builtin_platform_driver(of_fixed_factor_clk_driver);
+
+static int __init of_fixed_factor_clk_init(void)
+{
+	return platform_driver_register(&of_fixed_factor_clk_driver);
+}
+arch_initcall(of_fixed_factor_clk_init);
+
 #endif

@@ -157,6 +157,10 @@ config USB_USS720
 	  To compile this driver as a module, choose M here: the
 	  module will be called uss720.
 
+config USB_CANAAN_OTG20
+	tristate "canaan otg2.0 driver"
+	default y
+
 source "drivers/usb/serial/Kconfig"
 
 source "drivers/usb/misc/Kconfig"

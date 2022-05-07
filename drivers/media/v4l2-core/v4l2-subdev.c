@@ -557,7 +557,13 @@ int v4l2_subdev_link_validate_default(struct v4l2_subdev *sd,
 	if (source_fmt->format.width != sink_fmt->format.width
 	    || source_fmt->format.height != sink_fmt->format.height
 	    || source_fmt->format.code != sink_fmt->format.code)
+	{
+		printk("source_fmt->format.width(0x%x),sink_fmt->format.width(0x%x)\n",source_fmt->format.width,sink_fmt->format.width);
+		printk("source_fmt->format.height(0x%x),sink_fmt->format.height(0x%x)\n",source_fmt->format.height,sink_fmt->format.height);
+		printk("source_fmt->format.code(0x%x),sink_fmt->format.code(0x%x)\n",source_fmt->format.code,sink_fmt->format.code);
 		return -EPIPE;
+	}	
+		
 
 	/* The field order must match, or the sink field order must be NONE
 	 * to support interlaced hardware connected to bridges that support
@@ -565,7 +571,10 @@ int v4l2_subdev_link_validate_default(struct v4l2_subdev *sd,
 	 */
 	if (source_fmt->format.field != sink_fmt->format.field &&
 	    sink_fmt->format.field != V4L2_FIELD_NONE)
+	{
+		printk("source_fmt->format.field(0x%x),sink_fmt->format.field(0x%x)\n",source_fmt->format.field,sink_fmt->format.field);
 		return -EPIPE;
+	}	
 
 	return 0;
 }

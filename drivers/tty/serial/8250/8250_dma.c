@@ -141,7 +141,7 @@ void serial8250_rx_dma_flush(struct uart_8250_port *p)
 	struct uart_8250_dma *dma = p->dma;
 
 	if (dma->rx_running) {
-		dmaengine_pause(dma->rxchan);
+//		dmaengine_pause(dma->rxchan);
 		__dma_rx_complete(p);
 		dmaengine_terminate_async(dma->rxchan);
 	}
@@ -165,7 +165,7 @@ int serial8250_request_dma(struct uart_8250_port *p)
 	dma->rxconf.src_addr		= rx_dma_addr + UART_RX;
 
 	dma->txconf.direction		= DMA_MEM_TO_DEV;
-	dma->txconf.dst_addr_width	= DMA_SLAVE_BUSWIDTH_1_BYTE;
+	dma->txconf.dst_addr_width	= DMA_SLAVE_BUSWIDTH_4_BYTES;
 	dma->txconf.dst_addr		= tx_dma_addr + UART_TX;
 
 	dma_cap_zero(mask);

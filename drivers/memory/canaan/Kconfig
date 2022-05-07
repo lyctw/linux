@@ -1,0 +1,10 @@
+
+config CANAAN_MEMORY
+        tristate "Canaan memory driver"
+        help
+          Say Y for enabling the k510 shared memory management driver
+
+          To compile this support as a module, choose M here:
+          The module will be called allegro_encoder.
+          If unsure, say N.
+

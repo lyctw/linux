@@ -3726,6 +3726,8 @@ static int brcmf_sdio_buscoreprep(void *ctx)
 		brcmf_err("error writing for HT off\n");
 		return err;
 	}
+	/*temporary plan for stability*/
+	udelay(100);
 
 	/* If register supported, wait for ALPAvail and then force ALP */
 	/* This may take up to 15 milliseconds */
@@ -3740,7 +3742,7 @@ static int brcmf_sdio_buscoreprep(void *ctx)
 	SPINWAIT(((clkval = brcmf_sdiod_readb(sdiodev, SBSDIO_FUNC1_CHIPCLKCSR,
 					      NULL)),
 		 !SBSDIO_ALPAV(clkval)),
-		 PMU_MAX_TRANSITION_DLY);
+		 2*PMU_MAX_TRANSITION_DLY); /*temporary plan for stability*/
 
 	if (!SBSDIO_ALPAV(clkval)) {
 		brcmf_err("timeout on ALPAV wait, clkval 0x%02x\n",
@@ -3750,7 +3752,9 @@ static int brcmf_sdio_buscoreprep(void *ctx)
 
 	clkset = SBSDIO_FORCE_HW_CLKREQ_OFF | SBSDIO_FORCE_ALP;
 	brcmf_sdiod_writeb(sdiodev, SBSDIO_FUNC1_CHIPCLKCSR, clkset, &err);
-	udelay(65);
+	/*temporary plan for stability*/
+	//udelay(65);
+	udelay(100);
 
 	/* Also, disable the extra SDIO pull-ups */
 	brcmf_sdiod_writeb(sdiodev, SBSDIO_FUNC1_SDIOPULLUP, 0, NULL);

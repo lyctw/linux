@@ -1,0 +1,638 @@
+/* Copyright (c) 2022, Canaan Bright Sight Co., Ltd
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+*/
+
+/dts-v1/;
+/ {
+    #address-cells  = <2>;
+    #size-cells     = <2>;
+    compatible      = "canaan-creative,k510";
+    model           = "canaan-creative,k510";
+
+    aliases {
+        uart0               = &serial0;
+    };
+
+    chosen {
+        bootargs            = "root=/dev/mmcblk0p2 rw console=ttyS0,115200n8 debug loglevel=7";
+        stdout-path         = "uart0:115200n8";
+    };
+
+    cpus: cpus {
+        status              = "okay";
+        #address-cells      = <1>;
+        #size-cells         = <0>;
+        timebase-frequency  = <1250000>;
+
+        cpu0: cpu@0 {
+            status              = "okay";
+            compatible          = "riscv";
+            device_type         = "cpu";
+            reg                 = <0>;
+            riscv,isa           = "rv64i2p0m2p0a2p0f2p0d2p0c2p0xv5-0p0";
+            riscv,priv-major    = <1>;
+            riscv,priv-minor    = <10>;
+            mmu-type            = "riscv,sv39";
+            clock-frequency     = <792000000>;
+            i-cache-size        = <0x8000>;      /*L1 cache 32K*/
+            i-cache-line-size   = <32>;
+            d-cache-size        = <0x8000>;      /*L1 cache 32K*/
+            d-cache-line-size   = <32>;
+            next-level-cache    = <&l2>;
+        };
+        cpu1: cpu@1 {
+            status              = "okay";
+            compatible          = "riscv";
+            device_type         = "cpu";
+            reg                 = <1>;
+            riscv,isa           = "rv64i2p0m2p0a2p0f2p0d2p0c2p0xv5-0p0";
+            riscv,priv-major    = <1>;
+            riscv,priv-minor    = <10>;
+            mmu-type            = "riscv,sv39";
+            clock-frequency     = <792000000>;
+            i-cache-size        = <0x8000>;      /*L1 cache 32K*/
+            i-cache-line-size   = <32>;
+            d-cache-size        = <0x8000>;      /*L1 cache 32K*/
+            d-cache-line-size   = <32>;
+            next-level-cache    = <&l2>;
+        };
+    };
+
+    l2: l2-cache@9E900000 {
+        status              = "okay";
+        compatible          = "cache";
+        cache-level         = <2>;
+        cache-size          = <0x40000>;
+        reg                 = <0x0 0x9E900000 0x0 0x40000>; /*L2 cache 256K*/
+        andes,inst-prefetch = <3>;
+        andes,data-prefetch = <3>;
+        // The value format is <XRAMOCTL XRAMICTL>
+        andes,tag-ram-ctl = <0 0>;
+        andes,data-ram-ctl = <0 0>;
+    };
+
+    pmu: pmu {
+        status              = "okay";
+        compatible          = "riscv,andes-pmu";
+        device_type         = "pmu";
+    };
+
+    ddr_memory: memory@0 {
+        status              = "okay";
+        device_type         = "memory";
+        reg                 = <0x0 0x00000000 0x0 0x20000000>;
+    };
+    
+    /*DSP: 58M to 96M*/
+    
+    sharem:sharem@f000000 {
+        compatible          = "k510-share-memory";
+        reg                 = <0x0 0xf000000 0x0 0x10000000>;  /*240M~496M*/
+    };
+/*
+    sharem_cma:sharem_cma@8000000 {
+        compatible          = "k510-share-memory-cma";
+        reg                 = <0x0 0xf000000 0x0 0x10000000>;  //240M~496M
+    };
+*/
+/*    reserved-memory {
+        #address-cells = <2>;
+        #size-cells = <2>;
+        ranges;
+
+        share_memory_buffer: buffer@f000000 {
+            no-map;
+            reg = <0x0 0xf000000 0x0 0x10000000>;
+        };
+
+        dsp_buffer: buffer@1f000000 {
+            no-map;
+            reg = <0x0 0x1f000000 0x0 0xe00000>;
+        };
+
+        logo_buffer: buffer@1fe00000 {
+            no-map;
+            reg = <0x0 0x1fe00000 0x0 0x200000>;
+        };
+    };
+*/
+    soc: soc {
+        status              = "okay";
+        compatible          = "canaan,k510-soc";
+        #address-cells      = <2>;
+        #size-cells         = <2>;
+        ranges;
+    };
+
+    noc_bus: noc_bus@99900000 {
+        status              = "okay";
+        compatible          = "simple-bus";
+        reg                 = <0x0 0x99900000 0x0 0x40000>; /* noc qos etc. */
+        #address-cells      = <2>;
+        #size-cells         = <2>;
+        ranges;
+
+        axi_bus: axi_bus {
+            status              = "okay";
+            compatible          = "simple-bus";
+            #address-cells      = <2>;
+            #size-cells         = <2>;
+            ranges;
+
+            sram0: sram0@80000000 {
+                status              = "okay";
+                compatible          = "canaan,k510-sram0";
+                reg                 = <0x0 0x80000000 0x0 0x100000>;
+            };
+
+            sram1: sram1@80100000 {
+                status              = "okay";
+                compatible          = "canaan,k510-sram1";
+                reg                 = <0x0 0x80100000 0x0 0x80000>;
+            };
+
+            gnne: gnne@94000000 {
+                status              = "okay";
+                compatible          = "canaan,k510-gnne";
+                reg                 = <0x0 0x94000000 0x0 0x200000>;
+            };
+
+            dsp: dsp@99800000 {
+                status              = "okay";
+                compatible          = "canaan,k510-dsp";
+                reg                 = <0x0 0x99800000 0x0 0x80000>;
+            };
+        };
+
+        /* ahb */
+        ahb_bus: ahb_bus {
+            status              = "okay";
+            compatible          = "simple-bus";
+            #address-cells      = <2>;
+            #size-cells         = <2>;
+            ranges;
+
+            mctl: mctl@98000000 {
+                status              = "okay";
+                compatible          = "cadence,ddr-controller";
+                reg                 = <0x0 0x98000000 0x0 0x10000>;
+                #address-cells      = <2>;
+                #size-cells         = <2>;
+            };
+            
+            security: security {
+                status              = "okay";
+                compatible          = "simple-bus";
+                #address-cells      = <2>;
+                #size-cells         = <2>;
+                ranges;
+
+                aes: aes@91000000 {
+                    status              = "okay";
+                    compatible          = "canaan,k510-aes";
+                    reg                 = <0x0 0x91000000 0x0 0x10000>;
+                };
+
+                sha: sha@91010000 {
+                    status              = "okay";
+                    compatible          = "canaan,k510-sha";
+                    reg                 = <0x0 0x91010000 0x0 0x10000>;
+                };
+
+                otp: otp@91020000 {
+                    status              = "okay";
+                    compatible          = "canaan,k510-otp";
+                    reg                 = <0x0 0x91020000 0x0 0xc000>;
+                    #address-cells = <1>;
+	                #size-cells = <1>;
+                };
+
+                trng: trng@9102c200 {
+                    status              = "okay";
+                    compatible          = "canaan,k510-rng";
+                    reg                 = <0x0 0x9102c200 0x0 0x100>;
+                };
+
+
+                rom: rom@91040000 {
+                    status              = "okay";
+                    compatible          = "canaan,k510-rom";
+                    reg                 = <0x0 0x91040000 0x0 0x20000>;
+                };
+            };
+
+            storage_ahb: storage_ahb {
+                status              = "okay";
+                compatible          = "simple-bus";
+                #address-cells      = <2>;
+                #size-cells         = <2>;
+                ranges;
+
+                sdios: sdios@92400000 {
+                    status              = "okay";
+                    compatible          = "canaan, arasan-sdio-slave";
+                    reg                 = <0x0 0x92400000 0x0 0x20000>;
+                };
+            };
+
+            /* peri subsys. only include ahb */
+            peri_ahb: peri_ahb {
+                status              = "okay";
+                compatible          = "simple-bus";
+                #address-cells      = <2>;
+                #size-cells         = <2>;
+                ranges;
+
+                spi0: spi@96080000 {
+                    status              = "okay";
+                    compatible          = "snps,dwc-ssi-1.01a";
+                    reg                 = <0x0 0x96080000 0x0 0x1000>;
+                    num-cs              = <1>;
+                    reg-io-width        = <4>;
+                    #address-cells      = <2>;
+                    #size-cells         = <2>;
+                    ranges;
+                };
+                spi1: spi@96090000 {
+                    status              = "okay";
+                    compatible          = "snps,dwc-ssi-1.01a";
+                    reg                 = <0x0 0x96090000 0x0 0x1000>;
+                    num-cs              = <1>;
+                    reg-io-width        = <4>;
+                    #address-cells      = <2>;
+                    #size-cells         = <2>;
+                    ranges;
+                };
+                spi2: spi@960a0000 {
+                    status              = "okay";
+                    compatible          = "snps,dwc-ssi-1.01a";
+                    reg                 = <0x0 0x960a0000 0x0 0x1000>;
+                    num-cs              = <1>;
+                    reg-io-width        = <4>;
+                    #address-cells      = <2>;
+                    #size-cells         = <2>;
+                    ranges;
+                };
+                /* spi slave controller */
+                spis: spi@960b0000 {
+                    status              = "okay";
+                    compatible          = "snps,dwc-ssi-1.01a";
+                    reg                 = <0x0 0x960b0000 0x0 0x1000>;
+                    num-cs              = <1>;
+                    reg-io-width        = <4>;
+                    #address-cells      = <2>;
+                    #size-cells         = <2>;
+                    ranges;
+                };
+            };
+
+            /* usb */
+            usb: usb@93060000 {
+                status              = "okay";
+                compatible          = "Cadence,usb-dev1.00";
+                reg                 = <0x0 0x93060000 0x0 0x400>;
+            };
+        };
+
+        /* apb */
+        apb_bus: apb_bus {
+            status              = "okay";
+            compatible          = "simple-bus";
+            #address-cells      = <2>;
+            #size-cells         = <2>;
+            ranges;
+
+            storage_apb: storage_apb {
+                status              = "okay";
+                compatible          = "simple-bus";
+                #address-cells      = <2>;
+                #size-cells         = <2>;
+                ranges;
+
+                /* emmc */
+                sdio0: sdio@93000000 {
+                    status              = "okay";
+                    compatible          = "socionext,uniphier-sd4hc", "cdns,sd4hc";
+                    reg                 = <0x0 0x93000000 0x0 0x2000>;
+                };
+                sdio1: sdio@93010000 {
+                    status              = "okay";
+                    compatible          = "socionext,uniphier-sd4hc", "cdns,sd4hc";
+                    reg                 = <0x0 0x93010000 0x0 0x2000>;
+                };
+                sdio2: sdio@93020000 {
+                    status              = "okay";
+                    compatible          = "socionext,uniphier-sd4hc", "cdns,sd4hc";
+                    reg                 = <0x0 0x93020000 0x0 0x2000>;
+                };
+
+
+                emac: emac@93030000 {
+                    status              = "okay";
+                    compatible          = "cdns,k510-gem";
+                    reg                 = <0x0 0x93030000 0x0 0x10000>;
+                };
+
+                /* peri dma */
+                pdma: pdma@93040000 {
+                    status              = "okay";
+                    compatible          = "canaan,k510-pdma";
+                    reg                 = <0x0 0x93040000 0x0 0x400>;
+                };
+                /* system dma */
+                sdma: sdma@93050000 {
+                    status              = "okay";
+                    compatible          = "canaan,k510-sdma";
+                    reg                 = <0x0 0x93050000 0x0 0x2000>;
+                };
+            };
+
+            /* peri subsys, only include apb */
+            peri_apb: peri_apb {
+                status              = "okay";
+                compatible          = "simple-bus";
+                #address-cells      = <2>;
+                #size-cells         = <2>;
+                ranges;
+
+                serial0: serial@96000000 {
+                    status              = "okay";
+                    #address-cells      = <2>;
+                    #size-cells         = <2>;
+                    compatible          = "snps,dw-apb-uart";
+                    reg                 = <0x0 0x96000000 0x0 0x100>;
+                };
+
+                serial1: serial@96010000 {
+                    status              = "okay";
+                    #address-cells      = <2>;
+                    #size-cells         = <2>;
+                    compatible          = "snps,dw-apb-uart";
+                    reg                 = <0x0 0x96010000 0x0 0x1000>;
+                };
+                serial2: serial@96020000 {
+                    status              = "disable";
+                    compatible          = "snps,dw-apb-uart";
+                    reg                 = <0x0 0x96020000 0x0 0x100>;
+                };
+                serial3: serial@96030000 {
+                    status              = "disable";
+                    compatible          = "snps,dw-apb-uart";
+                    reg                 = <0x0 0x96030000 0x0 0x100>;
+                };
+                /* i2s slave */
+                i2ss: i2ss@96050000 {
+                    status              = "okay";
+                    compatible          = "snps,dw-apb-i2s";
+                    reg                 = <0x0 0x96050000 0x0 0x100>;
+                };
+                i2s: i2s@96060000 {
+                    status              = "okay";
+                    compatible          = "snps,designware-i2s";
+                    reg                 = <0x0 0x96060000 0x0 0x400>;
+                };
+                /* audio */
+                audio: audio@96060400 {
+                    status              = "okay";
+                    compatible          = "canaan,k510-audio";
+                    reg                 = <0x0 0x96060400 0x0 0xc00>;
+                };
+            };
+
+            /* manage subsystem */
+            manage_subsys: manage_subsys {
+                status              = "okay";
+                compatible          = "simple-bus";
+                #address-cells      = <2>;
+                #size-cells         = <2>;
+                ranges;
+                /* sysctl */
+                sysctl_boot: sysctl_boot@97000000 {
+                    status              = "okay";
+                    compatible          = "simple-bus";
+                    reg                 = <0x0 0x97000000 0x0 0x1000>;
+                };
+                sysctl_clock: sysctl_clock@97001000 {
+                    status              = "okay";
+                    compatible          = "simple-bus";
+                    reg                 = <0x0 0x97001000 0x0 0x1000>;
+                };
+                sysctl_reset: sysctl_reset@97002000 {
+                    status              = "okay";
+                    compatible          = "simple-bus";
+                    reg                 = <0x0 0x97002000 0x0 0x1000>;
+                };
+                sysctl_power: sysctl_power@97003000 {
+                    status              = "okay";
+                    compatible          = "simple-bus";
+                    reg                 = <0x0 0x97003000 0x0 0x1000>;
+                };
+
+                /* watchdog */
+                wdt0: wdt@97010000 {
+                    status              = "okay";
+                    compatible          = "snps,dw-wdt";
+                    reg                 = <0x0 0x97010000 0x0 0x100>;
+                };
+                wdt1: wdt@97020000 {
+                    status              = "okay";
+                    compatible          = "snps,dw-wdt";
+                    reg                 = <0x0 0x97020000 0x0 0x100>;
+                };
+                wdt2: wdt@97030000 {
+                    status              = "okay";
+                    compatible          = "snps,dw-wdt";
+                    reg                 = <0x0 0x97030000 0x0 0x100>;
+                };
+
+                /* iomux */
+                iomux: iomux@97040000 {
+                    status              = "okay";
+                    compatible          = "pinctrl-k510";
+                    reg                 = <0x0 0x97040000 0x0 0x1000>;
+                };
+
+                /* gpio */
+                gpio: gpio@97050000 {
+                    status              = "okay";
+                    compatible          = "snps,dw-apb-gpio";
+                    reg                 = <0x0 0x97050000 0x0 0x80>;
+                };
+
+                /* i2c */
+                i2c0: i2c@97060000 {
+                    status              = "okay";
+                    compatible          = "snps,designware-i2c";
+                    reg                 = <0x0 0x97060000 0x0 0x100>;
+                };
+                i2c1: i2c@97070000 {
+                    status              = "okay";
+                    compatible          = "snps,designware-i2c";
+                    reg                 = <0x0 0x97070000 0x0 0x100>;
+                };
+                i2c2: i2c@97080000 {
+                    status              = "okay";
+                    compatible          = "snps,designware-i2c";
+                    reg                 = <0x0 0x97080000 0x0 0x100>;
+                };
+                i2c3: i2c@97090000 {
+                    status              = "okay";
+                    compatible          = "snps,designware-i2c";
+                    reg                 = <0x0 0x97090000 0x0 0x100>;
+                };
+                i2c4: i2c@970a0000 {
+                    status              = "okay";
+                    compatible          = "snps,designware-i2c";
+                    reg                 = <0x0 0x970a0000 0x0 0x100>;
+                };
+                i2c5: i2c@970b0000 {
+                    status              = "okay";
+                    compatible          = "snps,designware-i2c";
+                    reg                 = <0x0 0x970b0000 0x0 0x100>;
+                };
+                i2c6: i2c@970c0000 {
+                    status              = "okay";
+                    compatible          = "snps,designware-i2c";
+                    reg                 = <0x0 0x970c0000 0x0 0x100>;
+                };
+
+                /* rtc */
+                rtc: rtc@970d0000 {
+                    status              = "okay";
+                    compatible          = "canaan,k510-rtc";
+                    reg                 = <0x0 0x970d0000 0x0 0x100>;
+                };
+
+                /* mailbox */
+                mailbox: mailbox@970e0000 {
+                    status              = "okay";
+                    compatible          = "canaan,k510-mailbox";
+                    reg                 = <0x0 0x970e0000 0x0 0x300>;
+                };
+
+                tsensor: tsensor@970e0300 {
+                    status              = "okay";
+                    compatible          = "canaan,k510-tsensor";
+                    reg               = <0x0 0x970e0300 0x0 0x100>;
+                };
+
+                /* pwm0 */
+                pwm0: pwm0@970f0000 {
+                    status              = "okay";
+                    compatible          = "canaan,k510-pwm";
+                    reg                 = <0x0 0x970f0000 0x0 0x40>;
+                };
+
+                /* pwm1 */
+                pwm1: pwm1@970f0000 {
+                    status              = "okay";
+                    compatible          = "canaan,k510-pwm";
+                    reg                 = <0x0 0x970f0040 0x0 0x40>;
+                };
+
+                /* vad */
+                vad: vad@97100000 {
+                    status              = "okay";
+                    compatible          = "canaan,k510-vad";
+                    reg                 = <0x0 0x97100000 0x0 0x100>;
+                };
+
+                /* timer */
+                timer: timer@97200000 {
+                    status              = "okay";
+                    compatible          = "snps,arc-timer";
+                    reg                 = <0x0 0x97200000 0x0 0x100>;
+                };
+            };
+
+            isp: isp@92600000 {
+                status              = "okay";
+                compatible          = "canaan,k510-isp";
+                reg                 = <0x0 0x92600000 0x0 0x100000>;
+            };
+
+			isp1: isp1@92600000 {
+				status				= "okay";
+				compatible			= "canaan,k510-isp1";
+				reg 				= <0x0 0x92600000 0x0 0x100000>;
+			};
+
+            twod: twod@92720000 {
+	            status              = "okay";
+                compatible          = "k510, kendrty_2d";
+                reg                 = <0x0 0x92720000 0x0 0x10000>;
+
+            };
+
+            display: display@92700000 {
+                status              = "okay";
+                compatible          = "canaan,k510-display","microsharp,display";
+                reg                 = <0x0 0x92700000 0x0 0x40000>;
+            };
+
+
+	    mipi_tx_dphy: mipi-tx-phy@92718000 {
+                compatible = "kendryte,kendryte-k510-dphy";
+                reg = <0x0 0x92718000 0x0 0x100>;
+                framerate = <30>;
+                #phy-cells = <0>;
+                status = "okay";
+
+            };
+
+            display_subsystem: display-subsystem {
+
+                compatible = "kendryte,display-subsystem";
+                ports = <&vop_out>;
+                status = "okay";
+                //connect = <&vop_out_dsi>;
+
+            };
+
+            vop: vop@92700000{
+                compatible = "kendryte,kendryte-k510-vop";
+                reg = <0x0 0x92700000 0x0 0x10000 >;
+                status = "okay";
+
+                vop_out: port {
+                        #address-cells = <1>;
+                        #size-cells = <0>;
+                        vop_out_dsi: endpoint@1 {
+                                reg = <0>;
+                                remote-endpoint = <&dsi_in_vop>;
+                        };
+                };
+            };
+
+            mipi_dsi: mipi_dsi@92710000{
+                compatible = "kendryte,kendryte-k510-dsi";
+                reg = <0x0 0x92710000 0x0 0x1000 >;
+                framerate = <30>;
+                phys = <&mipi_tx_dphy>;
+                phy-names = "mipi_dphy";
+                #size-cells = <0>;
+                #address-cells = <1>;
+                status = "okay";
+
+                ports {
+                        port {
+                                dsi_in_vop: endpoint {
+                                        remote-endpoint = <&vop_out_dsi>;
+                                };
+                        };
+                };
+
+
+            };
+
+            h264: h264@92740000 {
+                status              = "okay";
+                compatible          = "canaan,k510-h264","allegro,h264";
+                reg                 = <0x0 0x92740000 0x0 0x8600>;
+            };
+        };
+    };
+};

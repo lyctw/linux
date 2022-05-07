@@ -263,11 +263,12 @@ static int pwm_export_child(struct device *parent, struct pwm_device *pwm)
 	export->pwm = pwm;
 	mutex_init(&export->lock);
 
+	export->child.class = parent->class;
 	export->child.release = pwm_export_release;
 	export->child.parent = parent;
 	export->child.devt = MKDEV(0, 0);
 	export->child.groups = pwm_groups;
-	dev_set_name(&export->child, "pwm%u", pwm->hwpwm);
+	dev_set_name(&export->child, "pwm%u%u", pwm->chip->base, pwm->hwpwm);
 
 	ret = device_register(&export->child);
 	if (ret) {

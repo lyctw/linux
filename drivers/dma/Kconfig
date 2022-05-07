@@ -639,6 +639,21 @@ config ZX_DMA
 	help
 	  Support the DMA engine for ZTE ZX family platform devices.
 
+config K510_SYSDMA
+	tristate "K510 System DMA support"
+	depends on ARCH_RV64I
+	select DMA_ENGINE
+	select DMA_VIRTUAL_CHANNELS
+	help
+	  Enable support for the System DMA controller present in the K510 SoC.
+
+config K510_PERIDMA
+	tristate "K510 Periphal DMA support"
+	depends on ARCH_RV64I
+	select DMA_ENGINE
+	select DMA_VIRTUAL_CHANNELS
+	help
+	  Enable support for the Periphal DMA controller present in the K510 SoC.
 
 # driver files
 source "drivers/dma/bestcomm/Kconfig"

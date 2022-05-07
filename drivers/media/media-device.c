@@ -201,23 +201,33 @@ static long media_device_setup_link(struct media_device *mdev,
 	struct media_link *link = NULL;
 	struct media_entity *source;
 	struct media_entity *sink;
-
+	dev_dbg(mdev->dev,"%s:start!\n",__func__);
 	/* Find the source and sink entities and link.
 	 */
 	source = find_entity(mdev, linkd->source.entity);
 	sink = find_entity(mdev, linkd->sink.entity);
 
 	if (source == NULL || sink == NULL)
+	{
+		dev_err(mdev->dev,"%s:source(0x%x),sink(0x%x)!\n",__func__,source,sink);
 		return -EINVAL;
+	}	
 
 	if (linkd->source.index >= source->num_pads ||
 	    linkd->sink.index >= sink->num_pads)
+	{
+		dev_err(mdev->dev,"%s:source.index(%d),source->num_pads(%d),sink.index(%d),sink->num_pads(%d)\n",__func__,linkd->source.index,
+		source->num_pads,linkd->sink.index,sink->num_pads);
 		return -EINVAL;
+	}	
 
 	link = media_entity_find_link(&source->pads[linkd->source.index],
 				      &sink->pads[linkd->sink.index]);
 	if (link == NULL)
+	{
+		dev_err(mdev->dev,"%s:link(0x%x)!\n",__func__,link);
 		return -EINVAL;
+	}	
 
 	memset(linkd->reserved, 0, sizeof(linkd->reserved));
 

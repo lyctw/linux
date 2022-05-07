@@ -23,6 +23,7 @@ obj-$(CONFIG_DA8XX_DDRCTL)	+= da8xx-ddrctl.o
 
 obj-$(CONFIG_SAMSUNG_MC)	+= samsung/
 obj-$(CONFIG_TEGRA_MC)		+= tegra/
+obj-$(CONFIG_CANAAN_MEMORY)     += canaan/
 obj-$(CONFIG_TI_EMIF_SRAM)	+= ti-emif-sram.o
 ti-emif-sram-objs		:= ti-emif-pm.o ti-emif-sram-pm.o
 

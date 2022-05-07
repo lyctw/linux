@@ -475,7 +475,7 @@ static inline bool media_entity_enum_test(struct media_entity_enum *ent_enum,
 {
 	if (WARN_ON(entity->internal_idx >= ent_enum->idx_max))
 		return true;
-
+	printk("%s:internal_idx(0x%x),ent_enum->bmap(0x%x)\n",__func__,entity->internal_idx,*ent_enum->bmap);
 	return test_bit(entity->internal_idx, ent_enum->bmap);
 }
 

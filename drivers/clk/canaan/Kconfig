@@ -1,0 +1,5 @@
+config COMMON_CLK_CAN_K510
+	tristate "Clock driver for Canaan K510 soc"
+	depends on RISCV
+	---help---
+	   clock driver for the K510 SoC using common clock framework.

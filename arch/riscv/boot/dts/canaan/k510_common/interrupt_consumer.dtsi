@@ -1,0 +1,150 @@
+/* Copyright (c) 2022, Canaan Bright Sight Co., Ltd
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+*/
+
+/* interrupt parent: interrupt connect to plic0 */
+/* interrupts:       param1 interrupt line,  param2: 4 is high level trigger */
+
+/* gnne interrupt */
+&gnne {
+    interrupt-parent    = <&plic0>;
+    interrupts          = <39 4>;
+};
+
+&serial0 {
+    interrupt-parent    = <&plic0>;
+    interrupts          = <1 4>;
+};
+
+&serial1 {
+    interrupt-parent    = <&plic0>;
+    interrupts          = <2 4>;
+};
+/* spi0 for nandflash */
+&spi0 {
+    interrupt-parent    = <&plic0>;
+    interrupts          = <6 4>;
+};
+
+&spi1 {
+    interrupt-parent    = <&plic0>;
+    interrupts          = <7 4>;
+};
+
+&spi2 {
+    interrupt-parent    = <&plic0>;
+    interrupts          = <8 4>;
+};
+
+&spis {
+    interrupt-parent    = <&plic0>;
+    interrupts          = <9 4>;
+};
+
+/* sdio0 for emmc */
+&sdio0 {
+    interrupt-parent    = <&plic0>;
+    interrupts          = <48 4>;
+};
+
+&sdio1 {
+    interrupt-parent    = <&plic0>;
+    interrupts          = <49 4>;
+};
+
+&sdio2 {
+    interrupt-parent    = <&plic0>;
+    interrupts          = <50 4>;
+};
+
+&emac {
+    interrupt-parent    = <&plic0>;
+    interrupts          = <54 4 55 4 56 4>;
+};
+
+&i2c0 {
+    interrupt-parent    = <&plic0>;
+    interrupts          = <12 4>;
+};
+&i2c1 {
+    interrupt-parent    = <&plic0>;
+    interrupts          = <13 4>;
+};
+&i2c2 {
+    interrupt-parent    = <&plic0>;
+    interrupts          = <14 4>;
+};
+&i2c3 {
+    interrupt-parent    = <&plic0>;
+    interrupts          = <15 4>;
+};
+&i2c4 {
+    interrupt-parent    = <&plic0>;
+    interrupts          = <16 4>;
+};
+/*
+&i2s {
+    interrupt-parent    = <&plic0>;
+    interrupts          = <11 4>;
+};
+*/
+
+&usb {
+    interrupt-parent = <&plic0>;
+    interrupts = <45 4 46 4>;
+};
+
+&isp {
+    interrupt-parent = <&plic0>;
+    interrupts = <58 4 67 4>;
+};
+
+&isp1 {
+    interrupt-parent = <&plic0>;
+    interrupts = <58 4 59 4>;
+};
+
+&twod {
+    interrupt-parent = <&plic0>;
+    interrupts = <68 0>;
+};
+
+&h264 {
+    interrupt-parent = <&plic0>;
+    interrupts = <63 4>;
+};
+
+&pdma {
+    interrupt-parent = <&plic0>;
+    interrupts = <31 4>;
+};
+
+&sdma {
+    interrupt-parent = <&plic0>;
+    interrupts = <30 4>;
+};
+
+&rtc {
+    interrupt-parent = <&plic0>;
+    interrupts = <22 0 21 0>;
+};
+
+&tsensor {
+    interrupt-parent = <&plic0>;
+	interrupts = <28 4>;
+};
+
+&mailbox {
+    interrupt-parent = <&plic0>;
+	interrupts = <65 4>;
+};
+
+&vop {
+    interrupt-parent = <&plic0>;
+    interrupts = <67 4>;
+};
+
+

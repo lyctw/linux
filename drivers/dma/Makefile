@@ -75,6 +75,8 @@ obj-$(CONFIG_TI_EDMA) += edma.o
 obj-$(CONFIG_XGENE_DMA) += xgene-dma.o
 obj-$(CONFIG_ZX_DMA) += zx_dma.o
 obj-$(CONFIG_ST_FDMA) += st_fdma.o
+obj-$(CONFIG_K510_SYSDMA) += k510_sysdma.o 
+obj-$(CONFIG_K510_PERIDMA) += k510_peridma.o
 
 obj-y += mediatek/
 obj-y += qcom/

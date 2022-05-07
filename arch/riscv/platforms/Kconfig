@@ -18,9 +18,4 @@ config PLATFORM_AHBDMA
 	bool
 	default y
 
-config ATCSMU
-        bool "ATCSMU Support"
-        depends on RISCV && PLAT_AE350
-        help
-         Say N here if you want to disable SMU support
 endmenu

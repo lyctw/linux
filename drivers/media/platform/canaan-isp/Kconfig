@@ -1,0 +1,14 @@
+#
+# Platform drivers
+#
+
+config VIDEO_CANAAN_K510
+	tristate "canaan k510 Camera support"
+	depends on VIDEO_V4L2 && I2C && VIDEO_V4L2_SUBDEV_API
+    depends on HAS_DMA && OF
+    depends on HAS_IOMEM
+	select VIDEOBUF2_DMA_CONTIG
+	select MFD_SYSCON
+	select V4L2_FWNODE
+	---help---
+	  Driver for an canaan k510 camera controller.

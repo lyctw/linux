@@ -1,0 +1,6 @@
+menu "Canaan SoC drivers"
+
+config CANAAN_PM_DOMAIN
+        bool "Canaan power domain driver"
+        select PM_GENERIC_DOMAINS
+endmenu

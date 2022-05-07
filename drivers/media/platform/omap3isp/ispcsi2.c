@@ -1093,6 +1093,7 @@ static int csi2_set_stream(struct v4l2_subdev *sd, int enable)
 	}
 
 	csi2->state = enable;
+	
 	return 0;
 }
 
