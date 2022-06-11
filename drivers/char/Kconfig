@@ -452,4 +452,8 @@ config RANDOM_TRUST_BOOTLOADER
 	only mixes the entropy pool. This can also be configured at boot with
 	"random.trust_bootloader=on/off".
 
+config PCDEV
+	tristate "pcdev"
+	default m
+
 endmenu
