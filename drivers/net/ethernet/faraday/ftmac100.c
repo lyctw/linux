@@ -989,6 +989,7 @@ static int ftmac100_poll(struct napi_struct *napi, int budget)
 static int ftmac100_open(struct net_device *netdev)
 {
 	struct ftmac100 *priv = netdev_priv(netdev);
+	struct net *net;
 	int err;
 
 	err = ftmac100_alloc_buffers(priv);
@@ -1006,7 +1007,6 @@ static int ftmac100_open(struct net_device *netdev)
 	// set sysctl ip fragmentation parameters.
 	// sysctl -w net.ipv4.ipfrag_time
 	// sysctl -w net.ipv4.ipfrag_high_thresh
-	struct net *net;
 
 	net = dev_net(netdev);
 	net->ipv4.fqdir->timeout = (5 * HZ);		/* Decrease fragment timeout, 30 -> 5 */
@@ -1100,13 +1100,15 @@ static const struct net_device_ops ftmac100_netdev_ops = {
 /******************************************************************************
  * struct platform_driver functions
  *****************************************************************************/
+extern asmlinkage int readl_fixup(void __iomem * addr, unsigned int val);
+
 static int ftmac100_probe(struct platform_device *pdev)
 {
 	struct resource *res;
 	int irq;
 	struct net_device *netdev;
 	struct ftmac100 *priv;
-	int err;
+	int err, ret;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res)
@@ -1151,6 +1153,14 @@ static int ftmac100_probe(struct platform_device *pdev)
 	priv->base = ioremap(res->start, resource_size(res));
 	if (!priv->base) {
 		dev_err(&pdev->dev, "Failed to ioremap ethernet registers\n");
+		err = -EIO;
+		goto err_ioremap;
+	}
+
+	/* Check feature register */
+	ret = readl_fixup(priv->base+0x38, 0x7);
+	if (!ret){
+		dev_err(&pdev->dev, "feature registers not detect, bitmap not support ftmac100\n");
 		err = -EIO;
 		goto err_ioremap;
 	}
