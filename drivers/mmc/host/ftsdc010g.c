@@ -401,7 +401,7 @@ static void ftsdc_dma_cleanup(struct ftsdc_host *host)
 
 static int ftsdc_configure_dma(struct ftsdc_host *host)
 {
-	host->dma.chan = dma_request_slave_channel_reason(&host->pdev->dev,
+	host->dma.chan = dma_request_chan(&host->pdev->dev,
 		"rxtx");
 	if (PTR_ERR(host->dma.chan) == -ENODEV) {
 		struct ftsdc_mmc_config *pdata = host->pdev->dev.platform_data;
