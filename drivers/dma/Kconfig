@@ -87,7 +87,6 @@ config AMCC_PPC440SPE_ADMA
 
 config ATCDMAC300G
 	tristate "Andestech GENERIC DMA support"
-	depends on PLAT_AE350
 	select DMA_ENGINE
 	select DMATEST
 	help
