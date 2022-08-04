@@ -1,5 +1,17 @@
 menu "SoC selection"
 
+config PLAT_AE350
+	bool "Andes AE350 Platform"
+	select SERIAL_SIFIVE if TTY
+	select SERIAL_SIFIVE_CONSOLE if TTY
+	select CLK_SIFIVE
+	select CLK_SIFIVE_PRCI
+	select SIFIVE_PLIC
+	select RISCV_ERRATA_ALTERNATIVE if !XIP_KERNEL
+	select ERRATA_SIFIVE if !XIP_KERNEL
+	help
+	  This enables support for Andes AE350 platform hardware.
+
 config SOC_MICROCHIP_POLARFIRE
 	bool "Microchip PolarFire SoCs"
 	select MCHP_CLK_MPFS
