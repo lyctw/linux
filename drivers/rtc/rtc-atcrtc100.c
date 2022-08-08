@@ -23,6 +23,7 @@
 #include <linux/rtc.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/math64.h>
 #include <linux/platform_device.h>
 #include <linux/seq_file.h>
 #include <linux/interrupt.h>
@@ -133,10 +134,10 @@ static int atc_rtc_read_time(struct device *dev, struct rtc_time *tm)
 	unsigned long time = RTC_DAYS * 86400 + RTC_HOUR * 3600
 				+ RTC_MINUTE * 60 + RTC_SECOND;
 
-	rtc_time_to_tm(time, tm);
+	rtc_time64_to_tm(time, tm);
 	if (rtc_valid_tm(tm) < 0) {
 		dev_err(dev, "invalid date\n");
-		rtc_time_to_tm(0, tm);
+		rtc_time64_to_tm(0, tm);
 	}
 	return 0;
 }
@@ -144,16 +145,13 @@ static int atc_rtc_read_time(struct device *dev, struct rtc_time *tm)
 static int atc_rtc_set_time(struct device *dev, struct rtc_time *tm)
 {
 	struct atc_rtc *rtc = dev_get_drvdata(dev);
-	unsigned long time = 0;
+	time64_t time = 0;
 	u32 cnt = 0;
 
-	rtc_tm_to_time(tm, &time);
-	cnt |= (((time / 86400) & DAY_MSK) << DAY_OFF);
-	time %= 86400;
-	cnt |= (((time / 3600) & HOR_MSK) << HOR_OFF);
-	time %= 3600;
-	cnt |= (((time / 60) & MIN_MSK) << MIN_OFF);
-	time %= 60;
+	time = rtc_tm_to_time64(tm);
+	cnt |= ((div_s64_rem(time, 86400, (u32 *)&time) & DAY_MSK) << DAY_OFF);
+	cnt |= ((div_s64_rem(time, 3600, (u32 *)&time) & HOR_MSK) << HOR_OFF);
+	cnt |= ((div_s64_rem(time, 60, (u32 *)&time) & MIN_MSK) << MIN_OFF);
 	cnt |= ((time & SEC_MSK) << SEC_OFF);
 
 	spin_lock_irq(&rtc->lock);
@@ -249,7 +247,7 @@ static int atc_rtc_probe(struct platform_device *pdev)
 
 	ret = -EINVAL;
 
-	rtc->regbase = ioremap_nocache(rtc->res->start,
+	rtc->regbase = (void __iomem *) ioremap(rtc->res->start,
 				       rtc->res->end - rtc->res->start + 1);
 	if (!rtc->regbase)
 		goto err_ioremap1;
@@ -292,7 +290,7 @@ static int atc_rtc_probe(struct platform_device *pdev)
 	rtc->rtc_dev->max_user_freq = 256;
 	rtc->rtc_dev->irq_freq = 1;
 
-	ret = rtc_register_device(rtc->rtc_dev);
+	ret = devm_rtc_register_device(rtc->rtc_dev);
 	if (ret)
 		goto err_unmap;
 
