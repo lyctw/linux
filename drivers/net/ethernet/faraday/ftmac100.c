@@ -1101,13 +1101,10 @@ static const struct net_device_ops ftmac100_netdev_ops = {
 /******************************************************************************
  * struct platform_driver functions
  *****************************************************************************/
-extern asmlinkage int readl_fixup(void __iomem * addr, unsigned int val,
-				unsigned int shift_bits);
-
 static int ftmac100_probe(struct platform_device *pdev)
 {
 	int (*read_fixup)(void __iomem *addr, unsigned int val,
-			  unsigned int shift_bits);
+		unsigned int shift_bits);
 	struct resource *res;
 	int irq;
 	struct net_device *netdev;
