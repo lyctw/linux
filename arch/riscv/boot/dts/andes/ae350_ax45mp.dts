@@ -219,6 +219,7 @@
 			interrupts = <19 4>;
 			interrupt-parent = <&plic0>;
 		dma-coherent;
+			mac-address = [ 00 23 96 00 f4 72 ];
 		};
 		smu: smu@f0100000 {
 			compatible = "andestech,atcsmu";
