@@ -106,6 +106,7 @@
 #include <asm/setup.h>
 #include <asm/sections.h>
 #include <asm/cacheflush.h>
+#include <asm/sbi.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/initcall.h>
@@ -1551,6 +1552,8 @@ static int __ref kernel_init(void *unused)
 		else
 			return 0;
 	}
+
+	sbi_remote_custom_fn1(NULL, 1, 2);
 
 	if (!try_to_run_init_process("/sbin/init") ||
 	    !try_to_run_init_process("/etc/init") ||

@@ -337,6 +337,10 @@ static int __sbi_rfence_v02_call(unsigned long fid, unsigned long hmask,
 		ret = sbi_ecall(ext, fid, hmask, hbase, start,
 				size, arg4, 0);
 		break;
+	case SBI_EXT_RCUSTOM_FN1:
+		ret = sbi_ecall(ext, fid, hmask, hbase, start,
+				size, 0, 0);
+		break;
 	default:
 		pr_err("unknown function ID [%lu] for SBI extension [%d]\n",
 		       fid, ext);
@@ -550,6 +554,24 @@ int sbi_remote_hfence_vvma_asid(const struct cpumask *cpu_mask,
 			    cpu_mask, start, size, asid, 0);
 }
 EXPORT_SYMBOL(sbi_remote_hfence_vvma_asid);
+
+/**
+ * sbi_remote_custom_fn1 - Execute printf on given remote harts
+ *
+ * @cpu_mask: A cpu mask containing all the target harts
+ * @start: dummy
+ * @size:  dummy
+ *
+ * Return: 0 on success, appropriate linux error otherwise.
+ */
+ int sbi_remote_custom_fn1(const struct cpumask *cpu_mask,
+                        unsigned long start,
+                        unsigned long size)
+{
+        return __sbi_rfence(SBI_EXT_RCUSTOM_FN1,
+			    cpu_mask, start, size, 0, 0);
+}
+EXPORT_SYMBOL(sbi_remote_custom_fn1);
 
 static void sbi_srst_reset(unsigned long type, unsigned long reason)
 {

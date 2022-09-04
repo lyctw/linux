@@ -66,6 +66,7 @@ enum sbi_ext_rfence_fid {
 	SBI_EXT_RFENCE_REMOTE_HFENCE_GVMA,
 	SBI_EXT_RFENCE_REMOTE_HFENCE_VVMA_ASID,
 	SBI_EXT_RFENCE_REMOTE_HFENCE_VVMA,
+	SBI_EXT_RCUSTOM_FN1,
 };
 
 enum sbi_ext_hsm_fid {
@@ -265,6 +266,9 @@ int sbi_remote_hfence_vvma_asid(const struct cpumask *cpu_mask,
 				unsigned long start,
 				unsigned long size,
 				unsigned long asid);
+int sbi_remote_custom_fn1(const struct cpumask *cpu_mask,
+				unsigned long start,
+				unsigned long size);
 int sbi_probe_extension(int ext);
 
 /* Check if current SBI specification version is 0.1 or not */
