@@ -21,6 +21,7 @@ static inline void pmd_populate_kernel(struct mm_struct *mm,
 	unsigned long pfn = virt_to_pfn(pte);
 
 	set_pmd(pmd, __pmd((pfn << _PAGE_PFN_SHIFT) | _PAGE_TABLE));
+	local_flush_tlb_all();
 }
 
 static inline void pmd_populate(struct mm_struct *mm,
@@ -29,6 +30,7 @@ static inline void pmd_populate(struct mm_struct *mm,
 	unsigned long pfn = virt_to_pfn(page_address(pte));
 
 	set_pmd(pmd, __pmd((pfn << _PAGE_PFN_SHIFT) | _PAGE_TABLE));
+	local_flush_tlb_all();
 }
 
 #ifndef __PAGETABLE_PMD_FOLDED
@@ -37,6 +39,7 @@ static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
 	unsigned long pfn = virt_to_pfn(pmd);
 
 	set_pud(pud, __pud((pfn << _PAGE_PFN_SHIFT) | _PAGE_TABLE));
+	local_flush_tlb_all();
 }
 
 static inline void p4d_populate(struct mm_struct *mm, p4d_t *p4d, pud_t *pud)
@@ -45,6 +48,7 @@ static inline void p4d_populate(struct mm_struct *mm, p4d_t *p4d, pud_t *pud)
 		unsigned long pfn = virt_to_pfn(pud);
 
 		set_p4d(p4d, __p4d((pfn << _PAGE_PFN_SHIFT) | _PAGE_TABLE));
+		local_flush_tlb_all();
 	}
 }
 
@@ -56,6 +60,7 @@ static inline void p4d_populate_safe(struct mm_struct *mm, p4d_t *p4d,
 
 		set_p4d_safe(p4d,
 			     __p4d((pfn << _PAGE_PFN_SHIFT) | _PAGE_TABLE));
+		local_flush_tlb_all();
 	}
 }
 
@@ -65,6 +70,7 @@ static inline void pgd_populate(struct mm_struct *mm, pgd_t *pgd, p4d_t *p4d)
 		unsigned long pfn = virt_to_pfn(p4d);
 
 		set_pgd(pgd, __pgd((pfn << _PAGE_PFN_SHIFT) | _PAGE_TABLE));
+		local_flush_tlb_all();
 	}
 }
 
@@ -76,6 +82,7 @@ static inline void pgd_populate_safe(struct mm_struct *mm, pgd_t *pgd,
 
 		set_pgd_safe(pgd,
 			     __pgd((pfn << _PAGE_PFN_SHIFT) | _PAGE_TABLE));
+		local_flush_tlb_all();
 	}
 }
 

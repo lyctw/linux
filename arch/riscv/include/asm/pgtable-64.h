@@ -89,6 +89,7 @@ static inline int pud_leaf(pud_t pud)
 static inline void set_pud(pud_t *pudp, pud_t pud)
 {
 	*pudp = pud;
+	local_flush_tlb_all();
 }
 
 static inline void pud_clear(pud_t *pudp)
@@ -159,8 +160,10 @@ static inline unsigned long _pmd_pfn(pmd_t pmd)
 
 static inline void set_p4d(p4d_t *p4dp, p4d_t p4d)
 {
-	if (pgtable_l4_enabled)
+	if (pgtable_l4_enabled) {
 		*p4dp = p4d;
+		local_flush_tlb_all();
+	}
 	else
 		set_pud((pud_t *)p4dp, (pud_t){ p4d_val(p4d) });
 }
@@ -232,8 +235,10 @@ static inline pud_t *pud_offset(p4d_t *p4d, unsigned long address)
 
 static inline void set_pgd(pgd_t *pgdp, pgd_t pgd)
 {
-	if (pgtable_l5_enabled)
+	if (pgtable_l5_enabled) {
 		*pgdp = pgd;
+		local_flush_tlb_all();
+	}
 	else
 		set_p4d((p4d_t *)pgdp, (p4d_t){ pgd_val(pgd) });
 }
