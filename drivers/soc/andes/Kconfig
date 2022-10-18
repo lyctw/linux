@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: GPL-2.0
+
+if PLAT_AE350
+
+config ATCSMU
+	bool "ATCSMU Support"
+	depends on RISCV && PLAT_AE350
+	help
+	  SMU is typically used to program reset vectors
+	  before WDT triggers software reset.
+	  Say N here if you want to disable SMU support
+
+endif
