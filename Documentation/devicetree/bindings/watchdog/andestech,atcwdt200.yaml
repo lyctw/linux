@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/watchdog/andestech,atcwdt200.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Andes Technology ATCWDT200 watchdog
+
+maintainers:
+  - Dylan Jhong <dylan@andestech.com>
+  - Yu Chien Peter Lin <peterlin@andestech.com>
+
+description: |
+  The ATCWDT200 watchdog timer is an IP pre-integrated as APB bus
+  component on AE350 platform.
+
+allOf:
+  - $ref: "watchdog.yaml#"
+
+properties:
+  compatible:
+    items:
+      - const: andestech,atcwdt200
+
+  reg:
+    maxItems: 1
+
+  clock-frequency:
+    default: 15000000
+
+additionalProperties: true
+
+required:
+  - compatible
+  - reg
+  - clock-frequency
+
+examples:
+  - |
+    soc {
+        #address-cells = <2>;
+        #size-cells = <2>;
+
+        watchdog: watchdog@f0500000 {
+          compatible = "andestech,atcwdt200";
+          reg = <0x00 0xf0500000 0x00 0x00001000>;
+          interrupts = <3 4>;
+          interrupt-parent = <&plic0>;
+          clock-frequency = <15000000>;
+        };
+    };
