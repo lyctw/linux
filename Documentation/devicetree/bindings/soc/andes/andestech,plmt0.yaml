@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/soc/andes/andestech,plmt0.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Andes Technology NCEPLMT100 Machine Timer
+
+maintainers:
+  - Dylan Jhong <dylan@andestech.com>
+  - Yu Chien Peter Lin <peterlin@andestech.com>
+
+description:
+  The RISC-V architecture defines a machine timer that provides a
+  real-time counter and generates timer interrupts. NCEPLMT100 is an
+  implementation of the machine timer.
+  This timer is not to be confused with the real-time clock timer (RTC)
+  of typical computing platforms. Per RISC-V privileged specification,
+  the timer clock could be clocked at any arbitrary frequency as long as
+  it is a fixed frequency clock that is not affected by clock gating or
+  frequency scaling of clocks in the rest of the platform.
+
+properties:
+  compatible:
+    items:
+      - const: andestech,plmt0
+
+  reg:
+    maxItems: 1
+
+  interrupts-extended:
+    minItems: 1
+    maxItems: 8
+
+additionalProperties: false
+
+required:
+  - compatible
+  - reg
+  - interrupts-extended
+
+examples:
+  - |
+    soc {
+        #address-cells = <2>;
+        #size-cells = <2>;
+
+        plmt0: plmt0@e6000000 {
+          compatible = "andestech,plmt0";
+          reg = <0x00000000 0xe6000000 0x00000000 0x00100000>;
+          interrupts-extended = <&CPU0_intc 7
+                                 &CPU1_intc 7
+                                 &CPU2_intc 7
+                                 &CPU3_intc 7>;
+        };
+    };
