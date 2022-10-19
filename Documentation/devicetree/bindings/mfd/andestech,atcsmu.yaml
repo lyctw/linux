@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/mfd/andestech,atcsmu.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Andes Technology System Management Unit (SMU)
+
+maintainers:
+  - Dylan Jhong <dylan@andestech.com>
+  - Yu Chien Peter Lin <peterlin@andestech.com>
+
+description:
+  SMU provides versatile system management capabilities, including
+  clock, reset and power control based on power domain partitions.
+
+properties:
+  compatible:
+    items:
+      - const: andestech,atcsmu
+
+  reg:
+    maxItems: 1
+
+required:
+  - reg
+
+additionalProperties: false
+
+examples:
+  - |
+    soc {
+        #address-cells = <2>;
+        #size-cells = <2>;
+
+        smu: smu@f0100000 {
+          compatible = "andestech,atcsmu";
+          reg = <0x00000000 0xf0100000 0x00000000 0x00001000>;
+        };
+    };
