@@ -253,8 +253,33 @@
 		dma-coherent;
 		};
 		pmu: pmu {
-			compatible = "riscv,andes-pmu";
 			device_type = "pmu";
+			compatible = "riscv,andes-pmu","riscv,pmu";
+						  /* SBI event idx -> Andes HPM event */
+			riscv,event-to-mhpmevent = <0x3 0x0000 0x41>,
+						  /* SBI_PMU_HW_CACHE_REFERENCES -> DCACHE_ACCESS */
+						   <0x4 0x0000 0x51>,
+						  /* SBI_PMU_HW_CACHE_MISSES -> DCACHE_MISS */
+						   <0x10000 0x0000 0x61>,
+						  /* SBI_PMU_HW_CACHE_{L1D|OP_READ|RESULT_ACCESS} -> DCACHE_LOAD_ACCESS */
+						   <0x10001 0x0000 0x71>,
+						  /* SBI_PMU_HW_CACHE_{L1D|OP_READ|RESULT_MISS} -> DCACHE_LOAD_ACCESS */
+						   <0x10002 0x0000 0x81>,
+						  /* SBI_PMU_HW_CACHE_{L1D|OP_WRITE|RESULT_ACCESS} -> DCACHE_STORE_ACCESS */
+						   <0x10003 0x0000 0x91>,
+						  /* SBI_PMU_HW_CACHE_{L1D|OP_WRITE|RESULT_MISS} -> DCACHE_STORE_MISS */
+						   <0x10008 0x0000 0x21>,
+						  /* SBI_PMU_HW_CACHE_{L1I|OP_READ|RESULT_ACCESS} -> ICACHE_ACCESS */
+						   <0x10009 0x0000 0x31>;
+						  /* SBI_PMU_HW_CACHE_{L1I|OP_READ|RESULT_MISS} -> ICACHE_MISS */
+			riscv,event-to-mhpmcounters = <0x3 0x3 0x8>,
+						  /* SBI_PMU_HW_CACHE_REFERENCES SBI_PMU_HW_CACHE_REFERENCES MHPMCOUNTER3 */
+						      <0x4 0x4 0x10>,
+						  /* SBI_PMU_HW_CACHE_MISSES SBI_PMU_HW_CACHE_MISSES MHPMCOUNTER4 */
+						      <0x10000 0x10003 0x8>,
+						  /* SBI_PMU_HW_CACHE_{L1D|OP_READ|RESULT_ACCESS} SBI_PMU_HW_CACHE_{L1D|OP_WRITE|RESULT_MISS} -> MHPMCOUNTER3 */
+						      <0x10008 0x10009 0x8>;
+						  /* SBI_PMU_HW_CACHE_{L1I|OP_READ|RESULT_ACCESS} SBI_PMU_HW_CACHE_{L1I|OP_WRITE|RESULT_MISS} -> MHPMCOUNTER3 */
 		};
 		spi: spi@f0b00000 {
 			compatible = "andestech,atcspi200";
