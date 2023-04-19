@@ -3,6 +3,9 @@
 # Makefile for the kernel character device drivers.
 #
 
+CFLAGS_yc_cdrv.o += -O0 -ggdb3
+obj-$(CONFIG_YC_CDRV) += yc_cdrv.o
+
 obj-y				+= mem.o random.o
 obj-$(CONFIG_TTY_PRINTK)	+= ttyprintk.o
 obj-y				+= misc.o

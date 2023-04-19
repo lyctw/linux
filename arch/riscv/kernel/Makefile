@@ -3,6 +3,8 @@
 # Makefile for the RISC-V Linux kernel
 #
 
+CFLAGS_jump_label.o += -O0 -ggdb3
+
 ifdef CONFIG_FTRACE
 CFLAGS_REMOVE_ftrace.o	= $(CC_FLAGS_FTRACE)
 CFLAGS_REMOVE_patch.o	= $(CC_FLAGS_FTRACE)

@@ -3,6 +3,8 @@
 # Makefile for the linux kernel.
 #
 
+CFLAGS_jump_label.o += -O0 -ggdb3
+
 obj-y     = fork.o exec_domain.o panic.o \
 	    cpu.o exit.o softirq.o resource.o \
 	    sysctl.o capability.o ptrace.o user.o \
