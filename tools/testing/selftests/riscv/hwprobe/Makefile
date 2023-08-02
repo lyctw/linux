@@ -2,9 +2,12 @@
 # Copyright (C) 2021 ARM Limited
 # Originally tools/testing/arm64/abi/Makefile
 
-TEST_GEN_PROGS := hwprobe
+TEST_GEN_PROGS := hwprobe hwprobe_test
 
 include ../../lib.mk
 
 $(OUTPUT)/hwprobe: hwprobe.c sys_hwprobe.S
+	$(CC) -o$@ $(CFLAGS) $(LDFLAGS) $^
+
+$(OUTPUT)/hwprobe_test: hwprobe_test.c sys_hwprobe.S
 	$(CC) -o$@ $(CFLAGS) $(LDFLAGS) $^
