@@ -17,6 +17,7 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/smp.h>
+#include <asm/errata_list.h>
 
 static struct irq_domain *intc_domain;
 
@@ -24,6 +25,11 @@ static asmlinkage void riscv_intc_irq(struct pt_regs *regs)
 {
 	unsigned long cause = regs->cause & ~CAUSE_IRQ_FLAG;
 
+#ifdef CONFIG_ERRATA_ANDES_PMU
+	/* Remap Andes' S-mode performance monitor overflow interrupt */
+	if (cause == ((1 << 8) | ANDES_RV_IRQ_PMU))
+		cause &= ~(1 << 8);
+#endif
 	if (unlikely(cause >= BITS_PER_LONG))
 		panic("unexpected interrupt cause");
 
