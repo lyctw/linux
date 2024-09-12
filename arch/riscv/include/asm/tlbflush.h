@@ -15,31 +15,38 @@
 #define FLUSH_TLB_NO_ASID       ((unsigned long)-1)
 
 #ifdef CONFIG_MMU
+
+extern u64 nr_sfence_vma, nr_sfence_vma_all, nr_sfence_vma_asid;
+
 static inline void local_flush_tlb_all(void)
 {
+	__sync_fetch_and_add(&nr_sfence_vma_all, 1UL);
 	__asm__ __volatile__ ("sfence.vma" : : : "memory");
 }
 
 static inline void local_flush_tlb_all_asid(unsigned long asid)
 {
-	if (asid != FLUSH_TLB_NO_ASID)
+	if (asid != FLUSH_TLB_NO_ASID) {
+		__sync_fetch_and_add(&nr_sfence_vma_asid, 1UL);
 		ALT_SFENCE_VMA_ASID(asid);
-	else
+	} else
 		local_flush_tlb_all();
 }
 
 /* Flush one page from local TLB */
 static inline void local_flush_tlb_page(unsigned long addr)
 {
+	__sync_fetch_and_add(&nr_sfence_vma, 1UL);
 	ALT_SFENCE_VMA_ADDR(addr);
 }
 
 static inline void local_flush_tlb_page_asid(unsigned long addr,
 					     unsigned long asid)
 {
-	if (asid != FLUSH_TLB_NO_ASID)
+	if (asid != FLUSH_TLB_NO_ASID) {
+		__sync_fetch_and_add(&nr_sfence_vma, 1UL);
 		ALT_SFENCE_VMA_ADDR_ASID(addr, asid);
-	else
+	} else
 		local_flush_tlb_page(addr);
 }
 

@@ -4,8 +4,11 @@
 #include <linux/smp.h>
 #include <linux/sched.h>
 #include <linux/hugetlb.h>
+#include <linux/debugfs.h>
 #include <asm/sbi.h>
 #include <asm/mmu_context.h>
+
+u64 nr_sfence_vma, nr_sfence_vma_all, nr_sfence_vma_asid;
 
 /*
  * Flush entire TLB if number of entries to be flushed is greater
@@ -203,3 +206,12 @@ void arch_tlbbatch_flush(struct arch_tlbflush_unmap_batch *batch)
 			  FLUSH_TLB_MAX_SIZE, PAGE_SIZE);
 	cpumask_clear(&batch->cpumask);
 }
+
+static int debugfs_nr_sfence_vma(void)
+{
+	debugfs_create_u64("nr_sfence_vma", 0444, NULL, &nr_sfence_vma);
+	debugfs_create_u64("nr_sfence_vma_all", 0444, NULL, &nr_sfence_vma_all);
+	debugfs_create_u64("nr_sfence_vma_asid", 0444, NULL, &nr_sfence_vma_asid);
+	return 0;
+}
+device_initcall(debugfs_nr_sfence_vma);
