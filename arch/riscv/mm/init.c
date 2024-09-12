@@ -59,6 +59,8 @@ EXPORT_SYMBOL(pgtable_l4_enabled);
 EXPORT_SYMBOL(pgtable_l5_enabled);
 #endif
 
+bool tlb_caching_invalid_entries;
+
 phys_addr_t phys_ram_base __ro_after_init;
 EXPORT_SYMBOL(phys_ram_base);
 
@@ -776,6 +778,18 @@ static void __init disable_pgtable_l4(void)
 	satp_mode = SATP_MODE_39;
 }
 
+static void __init enable_pgtable_l5(void)
+{
+	pgtable_l5_enabled = true;
+	satp_mode = SATP_MODE_57;
+}
+
+static void __init enable_pgtable_l4(void)
+{
+	pgtable_l4_enabled = true;
+	satp_mode = SATP_MODE_48;
+}
+
 static int __init print_no4lvl(char *p)
 {
 	pr_info("Disabled 4-level and 5-level paging");
@@ -856,6 +870,114 @@ retry:
 	memset(early_p4d, 0, PAGE_SIZE);
 	memset(early_pud, 0, PAGE_SIZE);
 	memset(early_pmd, 0, PAGE_SIZE);
+
+	asm volatile(".word 0x12346533\n");
+}
+
+/* Determine at runtime if the uarch caches invalid TLB entries */
+static __init void set_tlb_caching_invalid_entries(void)
+{
+#define NR_RETRIES_CACHING_INVALID_ENTRIES	50
+	uintptr_t set_tlb_caching_invalid_entries_pmd = ((unsigned long)set_tlb_caching_invalid_entries) & PMD_MASK;
+	// TODO the test_addr as defined below could go into another pud...
+	uintptr_t test_addr = set_tlb_caching_invalid_entries_pmd + 2 * PMD_SIZE;
+	pmd_t valid_pmd;
+	u64 satp;
+	int i = 0;
+
+	/* To ease the page table creation */
+	disable_pgtable_l5();
+	disable_pgtable_l4();
+
+	/* Establish a mapping for set_tlb_caching_invalid_entries() in sv39 */
+	create_pgd_mapping(early_pg_dir,
+			   set_tlb_caching_invalid_entries_pmd,
+			   (uintptr_t)early_pmd,
+			   PGDIR_SIZE, PAGE_TABLE);
+
+	/* Handle the case where set_tlb_caching_invalid_entries straddles 2 PMDs */
+	create_pmd_mapping(early_pmd,
+			   set_tlb_caching_invalid_entries_pmd,
+			   set_tlb_caching_invalid_entries_pmd,
+			   PMD_SIZE, PAGE_KERNEL_EXEC);
+	create_pmd_mapping(early_pmd,
+			   set_tlb_caching_invalid_entries_pmd + PMD_SIZE,
+			   set_tlb_caching_invalid_entries_pmd + PMD_SIZE,
+			   PMD_SIZE, PAGE_KERNEL_EXEC);
+
+	/* Establish an invalid mapping */
+	create_pmd_mapping(early_pmd, test_addr, 0, PMD_SIZE, __pgprot(0));
+
+	/* Precompute the valid pmd here because the mapping for pfn_pmd() won't exist */
+	valid_pmd = pfn_pmd(PFN_DOWN(set_tlb_caching_invalid_entries_pmd), PAGE_KERNEL);
+
+	local_flush_tlb_all();
+	satp = PFN_DOWN((uintptr_t)&early_pg_dir) | SATP_MODE_39;
+	csr_write(CSR_SATP, satp);
+	asm volatile(".word 0x12346533\n");
+	/*
+	 * Set stvec to after the trapping access, access this invalid mapping
+	 * and legitimately trap
+	 */
+	// TODO: Should I save the previous stvec?
+#define ASM_STR(x)	__ASM_STR(x)
+	asm volatile(
+		"la a0, 1f				\n"
+		"csrw " ASM_STR(CSR_TVEC) ", a0		\n"
+		"ld a0, 0(%0)				\n"
+		".align 2				\n"
+		"1:					\n"
+		:
+		: "r" (test_addr)
+		: "a0"
+	);
+
+	/* Now establish a valid mapping to check if the invalid one is cached */
+	early_pmd[pmd_index(test_addr)] = valid_pmd;
+
+	/*
+	 * Access the valid mapping multiple times: indeed, we can't use
+	 * sfence.vma as a barrier to make sure the cpu did not reorder accesses
+	 * so we may trap even if the uarch does not cache invalid entries. By
+	 * trying a few times, we make sure that those uarchs will see the right
+	 * mapping at some point.
+	 */
+
+	i = NR_RETRIES_CACHING_INVALID_ENTRIES;
+
+#define ASM_STR(x)	__ASM_STR(x)
+	__asm__ __volatile__ goto(
+		"la a0, 1f					\n"
+		"csrw " ASM_STR(CSR_TVEC) ", a0			\n"
+		".align 2					\n"
+		"1:						\n"
+		"addi %0, %0, -1				\n"
+		"blt %0, zero, %l[caching_invalid_entries]	\n"
+		"ld a0, 0(%1)					\n"
+		:
+		: "r" (i), "r" (test_addr)
+		: "a0"
+		: caching_invalid_entries
+	);
+
+	csr_write(CSR_SATP, 0ULL);
+	local_flush_tlb_all();
+
+	/* If we don't trap, the uarch does not cache invalid entries! */
+	tlb_caching_invalid_entries = false;
+	goto clean;
+
+caching_invalid_entries:
+	csr_write(CSR_SATP, 0ULL);
+	local_flush_tlb_all();
+
+	tlb_caching_invalid_entries = true;
+clean:
+	memset(early_pg_dir, 0, PAGE_SIZE);
+	memset(early_pmd, 0, PAGE_SIZE);
+
+	enable_pgtable_l4();
+	enable_pgtable_l5();
 }
 #endif
 
@@ -1108,6 +1230,7 @@ asmlinkage void __init setup_vm(uintptr_t dtb_pa)
 #endif
 
 #if defined(CONFIG_64BIT) && !defined(CONFIG_XIP_KERNEL)
+	set_tlb_caching_invalid_entries();
 	set_satp_mode(dtb_pa);
 	set_mmap_rnd_bits_max();
 #endif
@@ -1353,6 +1476,9 @@ static void __init setup_vm_final(void)
 	local_flush_tlb_all();
 
 	pt_ops_set_late();
+
+	pr_info("uarch caches invalid entries: %s",
+		tlb_caching_invalid_entries ? "yes" : "no");
 }
 #else
 asmlinkage void __init setup_vm(uintptr_t dtb_pa)
