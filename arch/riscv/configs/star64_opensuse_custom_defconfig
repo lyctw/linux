@@ -102,7 +102,7 @@ CONFIG_PCI_HOST_GENERIC=y
 CONFIG_PCIE_XILINX=y
 CONFIG_DEVTMPFS=y
 CONFIG_DEVTMPFS_MOUNT=y
-CONFIG_EXTRA_FIRMWARE="amdgpu/polaris12_ce.bin amdgpu/polaris12_ce_2.bin amdgpu/polaris12_k_mc.bin amdgpu/polaris12_k_smc.bin amdgpu/polaris12_mc.bin amdgpu/polaris12_me.bin amdgpu/polaris12_me_2.bin amdgpu/polaris12_mec.bin amdgpu/polaris12_mec2.bin amdgpu/polaris12_mec2_2.bin amdgpu/polaris12_mec_2.bin amdgpu/polaris12_pfp.bin amdgpu/polaris12_pfp_2.bin amdgpu/polaris12_rlc.bin amdgpu/polaris12_sdma.bin amdgpu/polaris12_sdma1.bin amdgpu/polaris12_smc.bin amdgpu/polaris12_uvd.bin amdgpu/polaris12_vce.bin"
+CONFIG_EXTRA_FIRMWARE="radeon/CYPRESS_uvd.bin radeon/CEDAR_smc.bin radeon/CEDAR_me.bin radeon/CEDAR_pfp.bin radeon/CEDAR_rlc.bin amdgpu/polaris12_ce.bin amdgpu/polaris12_ce_2.bin amdgpu/polaris12_k_mc.bin amdgpu/polaris12_k_smc.bin amdgpu/polaris12_mc.bin amdgpu/polaris12_me.bin amdgpu/polaris12_me_2.bin amdgpu/polaris12_mec.bin amdgpu/polaris12_mec2.bin amdgpu/polaris12_mec2_2.bin amdgpu/polaris12_mec_2.bin amdgpu/polaris12_pfp.bin amdgpu/polaris12_pfp_2.bin amdgpu/polaris12_rlc.bin amdgpu/polaris12_sdma.bin amdgpu/polaris12_sdma1.bin amdgpu/polaris12_smc.bin amdgpu/polaris12_uvd.bin amdgpu/polaris12_vce.bin"
 CONFIG_EXTRA_FIRMWARE_DIR="/home/peterlin/Downloads/star64/linux-firmware"
 CONFIG_FW_LOADER_USER_HELPER=y
 # CONFIG_FIRMWARE_MEMMAP is not set
